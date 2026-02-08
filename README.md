@@ -4,6 +4,10 @@ Apple TV aerial screensaver videos playing natively on Samsung Smart TVs. Uses S
 
 30 curated aerial videos from Apple's CDN featuring cities, landscapes, space, and underwater scenes.
 
+## Thanks
+
+Inspired by [xscreensaver-aerial](https://github.com/graysky2/xscreensaver-aerial) by graysky2.
+
 ---
 
 ## Requirements
@@ -96,10 +100,6 @@ tizen run -p AerialScr0.AerialScreensaver -t <TV_NAME>
 | Right Arrow | Next video |
 | Channel Up / Down | Next video |
 | Back / Stop | Exit app |
-
-## Acknowledgments
-
-Inspired by [xscreensaver-aerial](https://github.com/graysky2/xscreensaver-aerial) by graysky2.
 
 ## License
 

@@ -1,3 +1,5 @@
 *.wgt
 .manifest.tmp
 .delta.lst
+author-signature.xml
+signature1.xml
