@@ -1,59 +1,247 @@
-var BASE = 'http://sylvan.apple.com/Aerials/2x/Videos/';
+// ── Settings ──
 
-var VIDEOS = [
-  BASE + 'AK_A004_C012_SDR_20191217_SDR_4K_HEVC.mov',
-  BASE + 'BO_A012_C031_SDR_20190726_SDR_4K_HEVC.mov',
-  BASE + 'BO_A014_C008_SDR_20190719_SDR_4K_HEVC.mov',
-  BASE + 'BO_A014_C023_SDR_20190717_F240F3709_SDR_4K_HEVC.mov',
-  BASE + 'BO_A018_C029_SDR_20190812_SDR_4K_HEVC.mov',
-  BASE + 'comp_1223LV_FLARE_v21_SDR_PS_FINAL_20180709_F0F5700_SDR_4K_HEVC.mov',
-  BASE + 'comp_A001_C004_1207W5_v23_SDR_FINAL_20180706_SDR_4K_HEVC.mov',
-  BASE + 'comp_A006_C003_1219EE_CC_v01_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov',
-  BASE + 'comp_A009_C001_010181A_v09_SDR_PS_FINAL_20180725_SDR_4K_HEVC.mov',
-  BASE + 'comp_A012_C014_1223PT_v53_SDR_PS_FINAL_20180709_F0F8700_SDR_4K_HEVC.mov',
-  BASE + 'comp_A103_C002_0205DG_v12_SDR_FINAL_20180706_SDR_4K_HEVC.mov',
-  BASE + 'comp_GMT110_112NC_364D_1054_AURORA_ANTARTICA__COMP_FINAL_v34_PS_SDR_20181107_SDR_4K_HEVC.mov',
-  BASE + 'comp_GMT306_139NC_139J_3066_CALI_TO_VEGAS_v07_SDR_FINAL_22062018_SDR_4K_HEVC.mov',
-  BASE + 'comp_GMT307_136NC_134K_8277_NY_NIGHT_01_v25_SDR_PS_20180907_SDR_4K_HEVC.mov',
-  BASE + 'comp_GMT308_139K_142NC_CARIBBEAN_DAY_v09_SDR_FINAL_22062018_SDR_4K_HEVC.mov',
-  BASE + 'comp_GMT314_139M_170NC_NORTH_AMERICA_AURORA__COMP_v22_SDR_20181206_v12CC_SDR_4K_HEVC.mov',
-  BASE + 'CR_A009_C007_SDR_20191113_SDR_4K_HEVC.mov',
-  BASE + 'DB_D001_C001_4K_SDR_HEVC.mov',
-  BASE + 'DB_D001_C005_4K_SDR_HEVC.mov',
-  BASE + 'DB_D002_C003_4K_SDR_HEVC.mov',
-  BASE + 'DL_B002_C011_SDR_20191122_SDR_4K_HEVC.mov',
-  BASE + 'g201_AK_A003_C014_SDR_20191113_SDR_4K_HEVC.mov',
-  BASE + 'g201_CA_A016_C002_SDR_20191114_SDR_4K_HEVC.mov',
-  BASE + 'GL_G002_C002_4K_SDR_HEVC.mov',
-  BASE + 'GL_G004_C010_4K_SDR_HEVC.mov',
-  BASE + 'HK_H004_C001_4K_SDR_HEVC.mov',
-  BASE + 'LA_A005_C009_4K_SDR_HEVC.mov',
-  BASE + 'LA_A006_C008_4K_SDR_HEVC.mov',
-  BASE + 'PA_A001_C007_SDR_20190717_SDR_4K_HEVC.mov',
-  BASE + 'SE_A016_C009_SDR_20190717_SDR_4K_HEVC.mov'
+var DEFAULT_SETTINGS = {
+  showDescription: true,
+  descriptionTimer: 3,
+  videoOrder: 'shuffle',
+  category: 'all',
+  customServerEnabled: false,
+  customServerUrl: 'http://192.168.2.4:8090',
+  devMode: false
+};
+
+var devSequence = '';
+var DEV_TARGET_SEQUENCE = '12345';
+
+var MENU_ITEMS = [
+  {
+    key: 'showDescription',
+    label: 'Show Description',
+    type: 'toggle',
+    options: [
+      { value: true, label: 'On' },
+      { value: false, label: 'Off' }
+    ]
+  },
+  {
+    key: 'descriptionTimer',
+    label: 'Description Timer',
+    type: 'number',
+    min: 1,
+    max: 15,
+    step: 1,
+    suffix: 's'
+  },
+  {
+    key: 'videoOrder',
+    label: 'Video Order',
+    type: 'toggle',
+    options: [
+      { value: 'shuffle', label: 'Shuffle' },
+      { value: 'sequential', label: 'Sequential' }
+    ]
+  },
+  {
+    key: 'category',
+    label: 'Category',
+    type: 'toggle',
+    options: [
+      { value: 'all', label: 'All' },
+      { value: 'space', label: 'Space' },
+      { value: 'sea', label: 'Sea' },
+      { value: 'landscape', label: 'Landscape' },
+      { value: 'cityscape', label: 'Cityscape' }
+    ]
+  },
+  {
+    key: 'customServerEnabled',
+    label: 'Use custom server',
+    type: 'toggle',
+    options: [
+      { value: true, label: 'Yes' },
+      { value: false, label: 'No' }
+    ],
+    devOnly: true
+  },
+  {
+    key: 'customServerUrl',
+    label: 'Files location',
+    type: 'text',
+    devOnly: true
+  }
 ];
 
+// ── State ──
+
+var settings = {};
+var playlist = [];
+var playlistIndex = -1;
 var videoIndex = -1;
-var loader = document.getElementById('loader');
+var menuOpen = false;
+var menuIndex = 0;
+var infoTimer = null;
+var firstPlay = true;
+
+// ── DOM ──
+
+var preloadEl = document.getElementById('preload');
 var fade = document.getElementById('fade');
+var info = document.getElementById('info');
+var infoLabel = document.getElementById('info-label');
+var infoDescription = document.getElementById('info-description');
+var menuEl = document.getElementById('menu');
+var menuItemsEl = document.getElementById('menu-items');
 var avplay = webapis.avplay;
+
+// ── LocalStorage persistence ──
+
+function loadSettings() {
+  try {
+    var saved = localStorage.getItem('aerial_settings');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      for (var key in DEFAULT_SETTINGS) {
+        if (DEFAULT_SETTINGS.hasOwnProperty(key)) {
+          settings[key] = parsed.hasOwnProperty(key) ? parsed[key] : DEFAULT_SETTINGS[key];
+        }
+      }
+      return;
+    }
+  } catch (e) {}
+  for (var key in DEFAULT_SETTINGS) {
+    if (DEFAULT_SETTINGS.hasOwnProperty(key)) {
+      settings[key] = DEFAULT_SETTINGS[key];
+    }
+  }
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem('aerial_settings', JSON.stringify(settings));
+  } catch (e) {}
+}
+
+// ── Playlist ──
+
+function buildPlaylist() {
+  playlist = [];
+  for (var i = 0; i < CATALOG.length; i++) {
+    if (settings.category === 'all' || CATALOG[i].category === settings.category) {
+      playlist.push(i);
+    }
+  }
+  if (playlist.length === 0) {
+    for (var j = 0; j < CATALOG.length; j++) {
+      playlist.push(j);
+    }
+  }
+  playlistIndex = -1;
+}
+
+function pickNext() {
+  if (settings.videoOrder === 'shuffle') {
+    var next;
+    do {
+      next = Math.floor(Math.random() * playlist.length);
+    } while (playlist[next] === videoIndex && playlist.length > 1);
+    playlistIndex = next;
+  } else {
+    playlistIndex = (playlistIndex + 1) % playlist.length;
+  }
+  return playlist[playlistIndex];
+}
+
+// ── Preload thumbnail ──
+
+var nextIndex = -1;
+
+function getPreloadPath(url) {
+  var filename = url.substring(url.lastIndexOf('/') + 1);
+  filename = filename.replace('.mov', '.jpg').replace('.mp4', '.jpg');
+  return 'preload/' + filename;
+}
+
+function prefetchNextThumbnail() {
+  nextIndex = pickNext();
+  new Image().src = getPreloadPath(CATALOG[nextIndex].url);
+}
+
+function showPreload(index, onComplete) {
+  if (!preloadEl) {
+    if (onComplete) onComplete();
+    return;
+  }
+  var path = getPreloadPath(CATALOG[index].url);
+  preloadEl.onerror = function () {
+    preloadEl.classList.remove('visible');
+    fade.classList.add('active');
+    if (onComplete) onComplete();
+  };
+  function onFadeIn(e) {
+    if (e.propertyName !== 'opacity') return;
+    preloadEl.removeEventListener('transitionend', onFadeIn);
+    if (onComplete) onComplete();
+  }
+  preloadEl.addEventListener('transitionend', onFadeIn);
+  preloadEl.src = path;
+  preloadEl.classList.add('visible');
+}
+
+function hidePreload() {
+  if (!preloadEl) return;
+  preloadEl.classList.remove('visible');
+  fade.classList.remove('active');
+}
+
+// ── Info overlay (description = loader) ──
+
+function showInfo(index) {
+  if (!settings.showDescription) return;
+  var video = CATALOG[index];
+  infoLabel.textContent = video.label;
+  infoDescription.textContent = video.description;
+  info.classList.add('visible');
+}
+
+function hideInfo() {
+  info.classList.remove('visible');
+  if (infoTimer) {
+    clearTimeout(infoTimer);
+    infoTimer = null;
+  }
+}
+
+function scheduleHideInfo() {
+  if (!settings.showDescription) return;
+  if (infoTimer) clearTimeout(infoTimer);
+  infoTimer = setTimeout(function () {
+    info.classList.remove('visible');
+    infoTimer = null;
+  }, settings.descriptionTimer * 1000);
+}
+
+// ── AVPlay ──
 
 var listener = {
   onbufferingstart: function () {},
   onbufferingprogress: function () {},
   onbufferingcomplete: function () {
-    loader.classList.add('hidden');
+    hidePreload();
+    scheduleHideInfo();
+    prefetchNextThumbnail();
   },
   onstreamcompleted: function () {
     stopAndClose();
-    playVideo(pickRandom());
+    var idx = nextIndex >= 0 ? nextIndex : pickNext();
+    nextIndex = -1;
+    playVideo(idx);
   },
   oncurrentplaytime: function () {},
   onevent: function () {},
   onerror: function () {
     stopAndClose();
     setTimeout(function () {
-      playVideo(pickRandom());
+      playVideo(pickNext());
     }, 2000);
   }
 };
@@ -63,49 +251,218 @@ function stopAndClose() {
   try { avplay.close(); } catch (e) {}
 }
 
-function pickRandom() {
-  var next;
-  do {
-    next = Math.floor(Math.random() * VIDEOS.length);
-  } while (next === videoIndex && VIDEOS.length > 1);
-  return next;
-}
-
-var firstPlay = true;
-
 function startVideo(index) {
   videoIndex = index;
   try { localStorage.setItem('aerial_index', videoIndex); } catch (e) {}
 
   stopAndClose();
+  showInfo(index);
 
   try {
-    avplay.open(VIDEOS[videoIndex]);
+    var url = CATALOG[videoIndex].url;
+    if (settings.customServerEnabled && settings.customServerUrl) {
+      var filename = url.substring(url.lastIndexOf('/') + 1);
+      url = settings.customServerUrl + (settings.customServerUrl.endsWith('/') ? '' : '/') + filename;
+    }
+
+    avplay.open(url);
     avplay.setDisplayRect(0, 0, 1920, 1080);
     avplay.setListener(listener);
     avplay.prepareAsync(function () {
       avplay.play();
-      loader.classList.add('hidden');
-      setTimeout(function () { fade.classList.remove('active'); }, 100);
     }, function () {
-      setTimeout(function () { playVideo(pickRandom()); }, 2000);
+      setTimeout(function () { playVideo(pickNext()); }, 2000);
     });
   } catch (e) {
-    setTimeout(function () { playVideo(pickRandom()); }, 2000);
+    setTimeout(function () { playVideo(pickNext()); }, 2000);
   }
 }
 
 function playVideo(index) {
-  if (firstPlay) {
+  hideInfo();
+  showPreload(index, function () {
     firstPlay = false;
     startVideo(index);
-    return;
-  }
-  fade.classList.add('active');
-  setTimeout(function () { startVideo(index); }, 1000);
+  });
 }
 
-// Remote control
+// ── Menu (DOM-based rendering) ──
+
+function createMenuItemEl(item, isActive) {
+  var value = settings[item.key];
+  var display = '';
+
+  if (item.type === 'toggle') {
+    for (var j = 0; j < item.options.length; j++) {
+      if (item.options[j].value === value) {
+        display = item.options[j].label;
+        break;
+      }
+    }
+  } else if (item.type === 'number') {
+    display = value + (item.suffix || '');
+  } else if (item.type === 'text') {
+    display = value;
+  }
+
+  var row = document.createElement('div');
+  row.className = 'menu-item' + (isActive ? ' active' : '');
+
+  var label = document.createElement('span');
+  label.className = 'menu-label';
+  label.textContent = item.label;
+
+  var val = document.createElement('span');
+  val.className = 'menu-value';
+
+  var arrowL = document.createElement('span');
+  arrowL.className = 'menu-arrow';
+  arrowL.textContent = item.type === 'text' ? '' : '\u25C0 ';
+
+  var text = document.createTextNode(display);
+
+  var arrowR = document.createElement('span');
+  arrowR.className = 'menu-arrow';
+  arrowR.textContent = item.type === 'text' ? '' : ' \u25B6';
+
+  val.appendChild(arrowL);
+  val.appendChild(text);
+  val.appendChild(arrowR);
+
+  row.appendChild(label);
+  row.appendChild(val);
+
+  return row;
+}
+
+function getVisibleMenuItems() {
+  var visible = [];
+  for (var i = 0; i < MENU_ITEMS.length; i++) {
+    if (!MENU_ITEMS[i].devOnly || settings.devMode) {
+      visible.push(MENU_ITEMS[i]);
+    }
+  }
+  return visible;
+}
+
+function renderMenu() {
+  while (menuItemsEl.firstChild) {
+    menuItemsEl.removeChild(menuItemsEl.firstChild);
+  }
+  var visible = getVisibleMenuItems();
+  for (var i = 0; i < visible.length; i++) {
+    menuItemsEl.appendChild(createMenuItemEl(visible[i], i === menuIndex));
+  }
+}
+
+function openMenu() {
+  menuOpen = true;
+  menuIndex = 0;
+  renderMenu();
+  menuEl.classList.add('visible');
+  if (settings.showDescription && videoIndex >= 0) {
+    showInfo(videoIndex);
+    if (infoTimer) { clearTimeout(infoTimer); infoTimer = null; }
+  }
+}
+
+function closeMenu() {
+  menuOpen = false;
+  menuEl.classList.remove('visible');
+  hideInfo();
+  saveSettings();
+}
+
+function testConnection(baseUrl, callback) {
+  var videoUrl = CATALOG[0].url;
+  var filename = videoUrl.substring(videoUrl.lastIndexOf('/') + 1);
+  var testUrl = baseUrl + (baseUrl.endsWith('/') ? '' : '/') + filename;
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('HEAD', testUrl, true);
+  xhr.timeout = 5000;
+  xhr.onreadystatechange = function () {
+    if (xhr.readyState === 4) {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        callback(true);
+      } else {
+        callback(false);
+      }
+    }
+  };
+  xhr.onerror = function () { callback(false); };
+  xhr.ontimeout = function () { callback(false); };
+  xhr.send();
+}
+
+function menuChangeValue(direction) {
+  var visible = getVisibleMenuItems();
+  var item = visible[menuIndex];
+  var current = settings[item.key];
+
+  if (item.type === 'toggle') {
+    var idx = 0;
+    for (var i = 0; i < item.options.length; i++) {
+      if (item.options[i].value === current) {
+        idx = i;
+        break;
+      }
+    }
+    var nextIdx = (idx + direction + item.options.length) % item.options.length;
+    var nextValue = item.options[nextIdx].value;
+
+    if (item.key === 'customServerEnabled' && nextValue === true) {
+      testConnection(settings.customServerUrl, function (success) {
+        if (success) {
+          settings[item.key] = true;
+        } else {
+          alert('Could not reach custom server. Test failed.');
+          settings[item.key] = false;
+        }
+        renderMenu();
+      });
+      return;
+    }
+
+    settings[item.key] = nextValue;
+  } else if (item.type === 'number') {
+    var val = current + (direction * item.step);
+    if (val < item.min) val = item.max;
+    if (val > item.max) val = item.min;
+    settings[item.key] = val;
+  } else if (item.type === 'text') {
+    var newVal = prompt('Enter files location URL', settings[item.key]);
+    if (newVal !== null && newVal !== '') {
+      testConnection(newVal, function (success) {
+        if (success) {
+          settings[item.key] = newVal;
+          renderMenu();
+        } else {
+          alert('Could not reach ' + newVal + '. URL not updated.');
+        }
+      });
+      return;
+    }
+  }
+
+  if (item.key === 'category') {
+    buildPlaylist();
+  }
+
+  if (item.key === 'showDescription') {
+    if (settings.showDescription && videoIndex >= 0) {
+      showInfo(videoIndex);
+      if (infoTimer) { clearTimeout(infoTimer); infoTimer = null; }
+    } else {
+      hideInfo();
+    }
+  }
+
+  renderMenu();
+}
+
+// ── Remote control ──
+
 try {
   tizen.tvinputdevice.registerKey('MediaPlayPause');
   tizen.tvinputdevice.registerKey('MediaPlay');
@@ -117,37 +474,102 @@ try {
 } catch (e) {}
 
 document.addEventListener('keydown', function (e) {
+  // ── Dev mode sequence (1-2-3-4-5) ──
+  var key = '';
+  if (e.keyCode >= 48 && e.keyCode <= 57) key = (e.keyCode - 48).toString();
+  else if (e.keyCode >= 96 && e.keyCode <= 105) key = (e.keyCode - 96).toString();
+
+  if (key !== '') {
+    devSequence += key;
+    if (devSequence.length > DEV_TARGET_SEQUENCE.length) {
+      devSequence = devSequence.substring(devSequence.length - DEV_TARGET_SEQUENCE.length);
+    }
+    if (devSequence === DEV_TARGET_SEQUENCE) {
+      settings.devMode = !settings.devMode;
+      saveSettings();
+      if (menuOpen) renderMenu();
+      devSequence = '';
+    }
+  }
+
+  if (menuOpen) {
+    var visible = getVisibleMenuItems();
+    switch (e.keyCode) {
+      case 38: // Up
+        menuIndex = (menuIndex - 1 + visible.length) % visible.length;
+        renderMenu();
+        break;
+      case 40: // Down
+        menuIndex = (menuIndex + 1) % visible.length;
+        renderMenu();
+        break;
+      case 37: // Left
+        menuChangeValue(-1);
+        break;
+      case 39: // Right
+        menuChangeValue(1);
+        break;
+      case 13: // Enter - toggle value
+        menuChangeValue(1);
+        break;
+      case 10009: // Back - close menu
+        closeMenu();
+        break;
+    }
+    return;
+  }
+
   switch (e.keyCode) {
-    case 13:    // Enter
+    case 13:    // Enter - open menu
+      openMenu();
+      break;
     case 10252: // PlayPause
       try {
         var state = avplay.getState();
         if (state === 'PLAYING') avplay.pause();
         else if (state === 'PAUSED') avplay.play();
-      } catch (e) {}
+      } catch (err) {}
       break;
     case 415:   // Play
-      try { avplay.play(); } catch (e) {}
+      try { avplay.play(); } catch (err) {}
       break;
     case 19:    // Pause
-      try { avplay.pause(); } catch (e) {}
+      try { avplay.pause(); } catch (err) {}
       break;
     case 417:   // FastForward - next video
     case 39:    // Right arrow
     case 427:   // ChannelUp
     case 428:   // ChannelDown
       stopAndClose();
-      playVideo(pickRandom());
+      var idx = nextIndex >= 0 ? nextIndex : pickNext();
+      nextIndex = -1;
+      playVideo(idx);
       break;
     case 413:   // Stop
-    case 10009: // Back
+    case 10009: // Back - exit app
       stopAndClose();
-      try { tizen.application.getCurrentApplication().exit(); } catch (e) {}
+      try { tizen.application.getCurrentApplication().exit(); } catch (err) {}
       break;
   }
 });
 
-// Start
+// ── Init ──
+
+loadSettings();
+buildPlaylist();
+
 var saved = -1;
 try { saved = parseInt(localStorage.getItem('aerial_index'), 10); } catch (e) {}
-playVideo(saved >= 0 && saved < VIDEOS.length ? saved : pickRandom());
+
+var startIdx = pickNext();
+if (saved >= 0 && saved < CATALOG.length) {
+  for (var i = 0; i < playlist.length; i++) {
+    if (playlist[i] === saved) {
+      startIdx = saved;
+      playlistIndex = i;
+      break;
+    }
+  }
+}
+
+playVideo(startIdx);

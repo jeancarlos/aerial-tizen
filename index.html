@@ -7,10 +7,20 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div id="loader">Aerial</div>
+  <img id="preload" src="" alt="">
   <div id="fade"></div>
+  <div id="info">
+    <div id="info-label"></div>
+    <div id="info-description"></div>
+  </div>
+  <div id="menu">
+    <div id="menu-title">Settings</div>
+    <div id="menu-items"></div>
+    <div id="menu-hint">BACK to close</div>
+  </div>
   <object id="player" type="application/avplayer" style="width:1920px;height:1080px;"></object>
   <script src="$WEBAPIS/webapis/webapis.js"></script>
+  <script src="js/catalog.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
