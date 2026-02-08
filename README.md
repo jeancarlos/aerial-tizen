@@ -97,6 +97,10 @@ tizen run -p AerialScr0.AerialScreensaver -t <TV_NAME>
 | Channel Up / Down | Next video |
 | Back / Stop | Exit app |
 
+## Acknowledgments
+
+Inspired by [xscreensaver-aerial](https://github.com/graysky2/xscreensaver-aerial) by graysky2.
+
 ## License
 
 [MIT](LICENSE)
