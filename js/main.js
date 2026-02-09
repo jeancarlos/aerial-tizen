@@ -6,7 +6,7 @@ var DEFAULT_SETTINGS = {
   videoOrder: 'shuffle',
   category: 'all',
   customServerEnabled: false,
-  customServerUrl: 'http://192.168.2.4:8090',
+  customServerUrl: 'http://192.168.1.200:8090',
   devMode: false
 };
 
@@ -496,6 +496,9 @@ document.addEventListener('keydown', function (e) {
     }
     if (devSequence === DEV_TARGET_SEQUENCE) {
       settings.devMode = !settings.devMode;
+      if (!settings.devMode) {
+        settings.customServerEnabled = false;
+      }
       saveSettings();
       if (menuOpen) renderMenu();
       devSequence = '';
