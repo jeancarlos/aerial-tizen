@@ -174,30 +174,6 @@ var CATALOG = [
     "category": "cityscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/DB_D008_C010_4K_SDR_HEVC.mov",
-    "label": "Dubai",
-    "description": "A wide aerial panorama captures Dubai's dramatic coastline as the sun sets over the Persian Gulf",
-    "category": "cityscape"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/DB_D001_C001_4K_SDR_HEVC.mov",
-    "label": "Dubai",
-    "description": "Dubai's downtown district gleams under city lights in a vivid HDR nighttime view",
-    "category": "cityscape"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/DB_D001_C005_4K_SDR_HEVC.mov",
-    "label": "Dubai",
-    "description": "The Palm Jumeirah stretches into the turquoise Persian Gulf in a dramatic HDR aerial pass",
-    "category": "cityscape"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/DB_D011_C010_4K_SDR_HEVC.mov",
-    "label": "Dubai",
-    "description": "Dubai's artificial islands form geometric patterns in the waters of the Arabian Gulf",
-    "category": "cityscape"
-  },
-  {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/G007_C004_UHD_SDR_4K_HEVC.mov",
     "label": "Grand Canyon",
     "description": "Aerial flight through the Grand Canyon reveals deep red and orange rock layers carved by millennia",
@@ -252,12 +228,6 @@ var CATALOG = [
     "category": "landscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/GL_G004_C010_4K_SDR_HEVC.mov",
-    "label": "Greenland",
-    "description": "Greenland's dramatic coastline where ancient ice meets the dark Arctic sea in vivid HDR",
-    "category": "landscape"
-  },
-  {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_H012_C009_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
     "label": "Hawaii",
     "description": "Volcanic Hawaiian coastline meets crashing Pacific waves in a dramatic aerial sweep",
@@ -309,12 +279,6 @@ var CATALOG = [
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_HK_H004_C008_PSNK_v19_SDR_PS_20180914_SDR_4K_HEVC.mov",
     "label": "Hong Kong",
     "description": "Hong Kong's harbor and mountains create a dramatic natural amphitheater sparkling at night",
-    "category": "cityscape"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/HK_B005_C011_4K_SDR_HEVC.mov",
-    "label": "Hong Kong",
-    "description": "Hong Kong's waterfront transitions from golden day to electric night in vivid HDR",
     "category": "cityscape"
   },
   {
@@ -408,12 +372,6 @@ var CATALOG = [
     "category": "landscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/LW_L001_C006_4K_SDR_HEVC.mov",
-    "label": "Liwa",
-    "description": "Liwa's crescent-shaped mega-dunes cast long shadows across the desert in vivid HDR warmth",
-    "category": "landscape"
-  },
-  {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_L007_C007_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
     "label": "London",
     "description": "The Thames winds through London past Big Ben and the Houses of Parliament at atmospheric dusk",
@@ -471,30 +429,6 @@ var CATALOG = [
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_LA_A009_C009_PSNK_v02_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
     "label": "Los Angeles",
     "description": "The LA skyline is silhouetted against a vibrant Pacific sunset in rich orange and purple hues",
-    "category": "cityscape"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/LA_A006_C008_4K_SDR_HEVC.mov",
-    "label": "Los Angeles",
-    "description": "Los Angeles harbor and coast captured in stunning HDR detail as evening falls",
-    "category": "cityscape"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/LA_A005_C009_4K_SDR_HEVC.mov",
-    "label": "Los Angeles",
-    "description": "Venice Beach and Santa Monica stretching along the coast in crisp HDR afternoon clarity",
-    "category": "cityscape"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/LA_A008_C004_4K_SDR_HEVC.mov",
-    "label": "Los Angeles",
-    "description": "Downtown LA's glass towers catch the last rays of sunset in vivid HDR warmth",
-    "category": "cityscape"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/LA_A011_C003_4K_SDR_HEVC.mov",
-    "label": "Los Angeles",
-    "description": "Hollywood Hills and Griffith Observatory glow in the soft HDR light of a Los Angeles evening",
     "category": "cityscape"
   },
   {
@@ -675,12 +609,6 @@ var CATALOG = [
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/SE_A016_C009_SDR_20190717_SDR_4K_HEVC.mov",
     "label": "Seals",
     "description": "Elephant seals bask on a California beach while Pacific waves lap gently at the shore",
-    "category": "sea"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/SE_A016_C009_SDR_20190717_3m30s_SDR_4K_HEVC.mov",
-    "label": "Seals",
-    "description": "Seals dive and play through coastal waters in crystal clear HDR",
     "category": "sea"
   },
   {

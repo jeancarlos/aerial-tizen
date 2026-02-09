@@ -105,6 +105,7 @@ function loadSettings() {
           settings[key] = parsed.hasOwnProperty(key) ? parsed[key] : DEFAULT_SETTINGS[key];
         }
       }
+      settings.customServerUrl = DEFAULT_SETTINGS.customServerUrl;
       return;
     }
   } catch (e) {}
@@ -251,6 +252,19 @@ function stopAndClose() {
   try { avplay.close(); } catch (e) {}
 }
 
+function getVideoUrl(index, mode) {
+  var url = CATALOG[index].url;
+  if (mode === 'https') {
+    return url.replace('http://', 'https://');
+  }
+  if (mode === 'custom') {
+    var base = settings.customServerUrl || DEFAULT_SETTINGS.customServerUrl;
+    var filename = url.substring(url.lastIndexOf('/') + 1);
+    return base + (base.endsWith('/') ? '' : '/') + filename;
+  }
+  return url;
+}
+
 function startVideo(index) {
   videoIndex = index;
   try { localStorage.setItem('aerial_index', videoIndex); } catch (e) {}
@@ -258,24 +272,42 @@ function startVideo(index) {
   stopAndClose();
   showInfo(index);
 
-  try {
-    var url = CATALOG[videoIndex].url;
-    if (settings.customServerEnabled && settings.customServerUrl) {
-      var filename = url.substring(url.lastIndexOf('/') + 1);
-      url = settings.customServerUrl + (settings.customServerUrl.endsWith('/') ? '' : '/') + filename;
-    }
-
-    avplay.open(url);
-    avplay.setDisplayRect(0, 0, 1920, 1080);
-    avplay.setListener(listener);
-    avplay.prepareAsync(function () {
-      avplay.play();
-    }, function () {
-      setTimeout(function () { playVideo(pickNext()); }, 2000);
-    });
-  } catch (e) {
-    setTimeout(function () { playVideo(pickNext()); }, 2000);
+  var urls;
+  if (settings.devMode && settings.customServerEnabled) {
+    urls = [getVideoUrl(videoIndex, 'custom')];
+  } else {
+    urls = [
+      getVideoUrl(videoIndex, 'http'),
+      getVideoUrl(videoIndex, 'https')
+    ];
   }
+
+  var attempt = 0;
+
+  function tryPlay() {
+    if (attempt >= urls.length) {
+      setTimeout(function () { playVideo(pickNext()); }, 2000);
+      return;
+    }
+    var videoUrl = urls[attempt];
+    try {
+      stopAndClose();
+      avplay.open(videoUrl);
+      avplay.setDisplayRect(0, 0, 1920, 1080);
+      avplay.setListener(listener);
+      avplay.prepareAsync(function () {
+        avplay.play();
+      }, function () {
+        attempt++;
+        tryPlay();
+      });
+    } catch (e) {
+      attempt++;
+      tryPlay();
+    }
+  }
+
+  tryPlay();
 }
 
 function playVideo(index) {
