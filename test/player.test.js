@@ -84,4 +84,18 @@ function boot() {
   assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'https://x/v0.mov'], 'a play() exception must fall back to the next URL');
 }
 
+{
+  const t = boot();
+  const prefs = {};
+  t.ctx.tizen.preference = {
+    exists: k => k in prefs,
+    getValue: k => prefs[k],
+    setValue: (k, v) => { prefs[k] = v; }
+  };
+  vm.runInContext("loadSettings(); settings.videoOrder = 'sequential'; saveSettings(); playVideo(3);", t.ctx);
+  assert.strictEqual(prefs.aerial_index, '3', 'playback position must be written to tizen.preference');
+  vm.runInContext("settings = {}; loadSettings();", t.ctx);
+  assert.strictEqual(t.ctx.settings.videoOrder, 'sequential', 'settings must load back from tizen.preference');
+}
+
 console.log('player tests passed');

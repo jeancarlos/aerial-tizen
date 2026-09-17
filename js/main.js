@@ -83,7 +83,6 @@ document.addEventListener('visibilitychange', function () {
 loadSettings();
 buildPlaylist();
 
-var savedIndex = -1;
-try { savedIndex = parseInt(localStorage.getItem('aerial_index'), 10); } catch (e) {}
+var savedIndex = parseInt(storageGet('aerial_index'), 10);
 playlistIndex = playlist.indexOf(savedIndex);
 playVideo(playlistIndex >= 0 ? savedIndex : pickNext());

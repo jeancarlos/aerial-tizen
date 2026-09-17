@@ -68,9 +68,21 @@ var MENU_ITEMS = [
 
 var settings = {};
 
+function storageGet(key) {
+  try {
+    if (tizen.preference.exists(key)) return tizen.preference.getValue(key);
+  } catch (e) {}
+  try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+
+function storageSet(key, value) {
+  try { tizen.preference.setValue(key, String(value)); } catch (e) {}
+  try { localStorage.setItem(key, value); } catch (e) {}
+}
+
 function loadSettings() {
   var parsed = {};
-  try { parsed = JSON.parse(localStorage.getItem('aerial_settings')) || {}; } catch (e) {}
+  try { parsed = JSON.parse(storageGet('aerial_settings')) || {}; } catch (e) {}
   for (var key in DEFAULT_SETTINGS) {
     if (DEFAULT_SETTINGS.hasOwnProperty(key)) {
       settings[key] = typeof parsed[key] === typeof DEFAULT_SETTINGS[key] ? parsed[key] : DEFAULT_SETTINGS[key];
@@ -79,5 +91,5 @@ function loadSettings() {
 }
 
 function saveSettings() {
-  try { localStorage.setItem('aerial_settings', JSON.stringify(settings)); } catch (e) {}
+  storageSet('aerial_settings', JSON.stringify(settings));
 }

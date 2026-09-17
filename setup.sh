@@ -12,14 +12,14 @@ echo "=== Aerial Screensaver - Setup ==="
 echo ""
 
 # Tizen Studio path first (needed for sdb)
-read -p "Tizen Studio path [${TIZEN_PATH:-/home/$USER/tizen-studio}]: " input
+read -rp "Tizen Studio path [${TIZEN_PATH:-/home/$USER/tizen-studio}]: " input
 TIZEN_PATH="${input:-${TIZEN_PATH:-/home/$USER/tizen-studio}}"
 
 export PATH="$TIZEN_PATH/tools/ide/bin:$TIZEN_PATH/tools:$PATH"
 
 # Connect to TV
 echo ""
-read -p "TV IP address [${TV_IP:-}]: " input
+read -rp "TV IP address [${TV_IP:-}]: " input
 TV_IP="${input:-$TV_IP}"
 
 if [ -z "$TV_IP" ]; then
@@ -35,7 +35,7 @@ echo ""
 echo "Available devices:"
 sdb devices 2>/dev/null | tail -n +2
 echo ""
-read -p "TV name [${TV_NAME:-}]: " input
+read -rp "TV name [${TV_NAME:-}]: " input
 TV_NAME="${input:-$TV_NAME}"
 
 if [ -z "$TV_NAME" ]; then
@@ -54,15 +54,15 @@ if [ -n "$DETECTED_DUID" ]; then
 elif [ -n "$DUID" ]; then
   echo "Using saved DUID: $DUID"
 else
-  read -p "Enter DUID manually: " DUID
+  read -rp "Enter DUID manually: " DUID
 fi
 
 # Tizen Studio data path
-read -p "Tizen Studio data path [${TIZEN_DATA:-/home/$USER/tizen-studio-data}]: " input
+read -rp "Tizen Studio data path [${TIZEN_DATA:-/home/$USER/tizen-studio-data}]: " input
 TIZEN_DATA="${input:-${TIZEN_DATA:-/home/$USER/tizen-studio-data}}"
 
 # Security profile
-read -p "Security profile name [${PROFILE:-AerialProfile}]: " input
+read -rp "Security profile name [${PROFILE:-AerialProfile}]: " input
 PROFILE="${input:-${PROFILE:-AerialProfile}}"
 
 # Write .env

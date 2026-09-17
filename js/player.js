@@ -52,9 +52,16 @@ function takeNext() {
 
 // ── Preload thumbnail ──
 
+function fileName(url) {
+  return url.substring(url.lastIndexOf('/') + 1);
+}
+
+function joinUrl(base, name) {
+  return base + (base.endsWith('/') ? '' : '/') + name;
+}
+
 function getPreloadPath(url) {
-  var filename = url.substring(url.lastIndexOf('/') + 1);
-  return 'preload/' + filename.replace(/\.(mov|mp4)$/, '.jpg');
+  return 'preload/' + fileName(url).replace(/\.(mov|mp4)$/, '.jpg');
 }
 
 function prefetchNextThumbnail() {
@@ -108,8 +115,7 @@ function stopPlayback() {
 function getVideoUrls(index) {
   var url = CATALOG[index].url;
   if (settings.devMode && settings.customServerEnabled) {
-    var base = settings.customServerUrl;
-    return [base + (base.endsWith('/') ? '' : '/') + url.substring(url.lastIndexOf('/') + 1)];
+    return [joinUrl(settings.customServerUrl, fileName(url))];
   }
   return [url, url.replace('http://', 'https://')];
 }
@@ -175,7 +181,7 @@ function playVideo(index) {
   var token = playToken;
   hideInfo();
   videoIndex = index;
-  try { localStorage.setItem('aerial_index', index); } catch (e) {}
+  storageSet('aerial_index', index);
 
   preloadEl.onerror = function () {
     if (token !== playToken || !preloadEl.classList.contains('visible')) return;

@@ -98,7 +98,9 @@
         simVideo.load();
       },
       play: function () {
-        simVideo.play();
+        simVideo.play().catch(function (e) {
+          if (e.name !== 'AbortError' && simListener.onerror) simListener.onerror();
+        });
         this._state = 'PLAYING';
       },
       pause: function () {

@@ -82,8 +82,7 @@ function moveMenu(direction) {
 }
 
 function testConnection(baseUrl, callback) {
-  var videoUrl = CATALOG[0].url;
-  var testUrl = baseUrl + (baseUrl.endsWith('/') ? '' : '/') + videoUrl.substring(videoUrl.lastIndexOf('/') + 1);
+  var testUrl = joinUrl(baseUrl, fileName(CATALOG[0].url));
   var xhr = new XMLHttpRequest();
   xhr.timeout = 5000;
   xhr.onload = function () { callback(xhr.status >= 200 && xhr.status < 300); };
