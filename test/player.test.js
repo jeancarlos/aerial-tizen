@@ -75,13 +75,28 @@ function boot() {
 
 {
   const t = boot();
+  const fails = [];
+  t.ctx.webapis.avplay.prepareAsync = (ok, fail) => fails.push(fail);
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  t.flush();
+  for (let i = 0; i < 3; i++) { fails[fails.length - 1](); t.flush(); }
+  assert.deepStrictEqual(
+    t.opened,
+    ['http://x/v0.mov', 'http://x/v0.mov', 'http://x/v0.mov', 'https://x/v0.mov'],
+    'a failing URL must be retried twice before the next URL is tried'
+  );
+}
+
+{
+  const t = boot();
   const prepared = [];
   t.ctx.webapis.avplay.prepareAsync = ok => prepared.push(ok);
   t.ctx.webapis.avplay.play = () => { throw new Error('InvalidStateError'); };
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
   t.flush();
   prepared[0]();
-  assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'https://x/v0.mov'], 'a play() exception must fall back to the next URL');
+  t.flush();
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v0.mov'], 'a play() exception must retry instead of stalling');
 }
 
 {

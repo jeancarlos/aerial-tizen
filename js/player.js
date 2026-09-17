@@ -1,5 +1,6 @@
 var PRELOAD_FADE_MS = 500;
 var ERROR_SKIP_MS = 2000;
+var RETRY_DELAYS_MS = [1000, 3000];
 
 var playlist = [];
 var playlistIndex = -1;
@@ -131,18 +132,30 @@ function skipAfterError() {
 function startVideo(index, token) {
   showInfo(index);
   var urls = getVideoUrls(index);
-  var attempt = 0;
+  var urlIndex = 0;
+  var retry = 0;
+
+  function failed() {
+    if (token !== playToken) return;
+    if (retry < RETRY_DELAYS_MS.length) {
+      var delay = RETRY_DELAYS_MS[retry++];
+      setTimeout(function () {
+        if (token === playToken) tryPlay();
+      }, delay);
+      return;
+    }
+    retry = 0;
+    urlIndex++;
+    if (urlIndex >= urls.length) skipAfterError();
+    else tryPlay();
+  }
 
   function tryPlay() {
     if (token !== playToken) return;
-    if (attempt >= urls.length) {
-      skipAfterError();
-      return;
-    }
     var prepared = false;
     try {
       stopAndClose();
-      avplay.open(urls[attempt++]);
+      avplay.open(urls[urlIndex]);
       avplay.setDisplayRect(0, 0, 1920, 1080);
       try { avplay.setStreamingProperty('SET_MODE_4K', 'TRUE'); } catch (e) {}
       avplay.setListener({
@@ -156,7 +169,7 @@ function startVideo(index, token) {
           if (token === playToken) playVideo(takeNext());
         },
         onerror: function () {
-          if (prepared && token === playToken) skipAfterError();
+          if (prepared) failed();
         }
       });
       avplay.prepareAsync(function () {
@@ -165,11 +178,11 @@ function startVideo(index, token) {
         try {
           avplay.play();
         } catch (e) {
-          tryPlay();
+          failed();
         }
-      }, tryPlay);
+      }, failed);
     } catch (e) {
-      tryPlay();
+      failed();
     }
   }
 
