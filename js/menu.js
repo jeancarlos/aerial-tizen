@@ -85,12 +85,16 @@ function testConnection(baseUrl, callback) {
   var videoUrl = CATALOG[0].url;
   var testUrl = baseUrl + (baseUrl.endsWith('/') ? '' : '/') + videoUrl.substring(videoUrl.lastIndexOf('/') + 1);
   var xhr = new XMLHttpRequest();
-  xhr.open('HEAD', testUrl, true);
   xhr.timeout = 5000;
   xhr.onload = function () { callback(xhr.status >= 200 && xhr.status < 300); };
   xhr.onerror = function () { callback(false); };
   xhr.ontimeout = function () { callback(false); };
-  xhr.send();
+  try {
+    xhr.open('HEAD', testUrl, true);
+    xhr.send();
+  } catch (e) {
+    callback(false);
+  }
 }
 
 function applySetting(key, value) {

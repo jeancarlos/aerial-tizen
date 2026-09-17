@@ -156,7 +156,11 @@ function startVideo(index, token) {
       avplay.prepareAsync(function () {
         if (token !== playToken) return;
         prepared = true;
-        avplay.play();
+        try {
+          avplay.play();
+        } catch (e) {
+          tryPlay();
+        }
       }, tryPlay);
     } catch (e) {
       tryPlay();
@@ -174,6 +178,7 @@ function playVideo(index) {
   try { localStorage.setItem('aerial_index', index); } catch (e) {}
 
   preloadEl.onerror = function () {
+    if (token !== playToken || !preloadEl.classList.contains('visible')) return;
     preloadEl.classList.remove('visible');
     fade.classList.add('active');
   };

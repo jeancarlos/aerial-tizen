@@ -73,4 +73,15 @@ function boot() {
   assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v1.mov'], 'a stale prepare failure must not reopen the old video');
 }
 
+{
+  const t = boot();
+  const prepared = [];
+  t.ctx.webapis.avplay.prepareAsync = ok => prepared.push(ok);
+  t.ctx.webapis.avplay.play = () => { throw new Error('InvalidStateError'); };
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  t.flush();
+  prepared[0]();
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'https://x/v0.mov'], 'a play() exception must fall back to the next URL');
+}
+
 console.log('player tests passed');
