@@ -84,6 +84,28 @@ else
   echo "$dupes" | sed 's/^/    /'
 fi
 
+# ── Thumbnail checks ──
+
+echo ""
+echo "Thumbnail checks:"
+
+missing_thumbs=""
+while read -r url; do
+  thumb="$ROOT/preload/$(basename "$url" .mov | sed 's/$/.webp/')"
+  [ -f "$thumb" ] || missing_thumbs="$missing_thumbs$thumb\n"
+done <<< "$catalog_urls"
+
+msg="Every catalog URL has a preload/*.webp thumbnail"
+if [ -z "$missing_thumbs" ]; then
+  ok "$msg"
+else
+  fail "$msg:"
+  printf "$missing_thumbs" | sed 's/^/    /'
+fi
+
+msg="No leftover .jpg thumbnails"
+check [ "$(find "$ROOT/preload" -name '*.jpg' | wc -l)" -eq 0 ]
+
 # ── Summary ──
 total=$((passed + failed))
 echo ""

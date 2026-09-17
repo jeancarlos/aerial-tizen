@@ -61,7 +61,7 @@ function joinUrl(base, name) {
 }
 
 function getPreloadPath(url) {
-  return 'preload/' + fileName(url).replace(/\.(mov|mp4)$/, '.jpg');
+  return 'preload/' + fileName(url).replace(/\.(mov|mp4)$/, '.webp');
 }
 
 function prefetchNextThumbnail() {
