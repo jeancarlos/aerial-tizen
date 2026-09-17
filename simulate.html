@@ -82,6 +82,7 @@
         this._state = 'IDLE';
       },
       setDisplayRect: function () {},
+      setStreamingProperty: function () {},
       setListener: function (l) { simListener = l; },
       prepareAsync: function (onSuccess, onError) {
         var self = this;
@@ -178,6 +179,9 @@
     if (keys) keys.classList.add('fade');
   }, {once: true});
   </script>
+  <script src="js/settings.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/menu.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

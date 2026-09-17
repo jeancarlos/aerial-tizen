@@ -9,14 +9,7 @@ html, body {
   height: 100%;
   overflow: hidden;
   background: #1429a0;
-}
-
-video {
-  inset: 0;
-  width: 1920px;
-  height: 1080px;
-  object-fit: cover;
-  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
 }
 
 /* ── Preload thumbnail ── */
@@ -72,7 +65,6 @@ video {
 
 #info-label {
   color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
   font-size: 34px;
   font-weight: 600;
   letter-spacing: 0.5px;
@@ -82,7 +74,6 @@ video {
 
 #info-description {
   color: rgba(255, 255, 255, 0.85);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
   font-size: 21px;
   font-weight: 400;
   letter-spacing: 0.3px;
@@ -114,7 +105,6 @@ video {
 
 #menu-title {
   color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
   font-size: 28px;
   font-weight: 600;
   text-align: center;
@@ -139,7 +129,6 @@ video {
 
 .menu-label {
   color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
   font-size: 22px;
   font-weight: 400;
   flex-shrink: 0;
@@ -147,7 +136,6 @@ video {
 
 .menu-value {
   color: rgba(255, 255, 255, 0.9);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
   font-size: 22px;
   font-weight: 500;
   min-width: 140px;
@@ -169,7 +157,6 @@ video {
 
 #menu-hint {
   color: rgba(255, 255, 255, 0.35);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
   font-size: 16px;
   text-align: center;
   margin-top: 24px;
