@@ -90,21 +90,15 @@ var CATALOG = [
     "category": "space"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_CH_C002_C005_PSNK_v05_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
-    "label": "China",
-    "description": "Rolling green hills and winding rivers of the Chinese countryside from a sweeping aerial pass",
-    "category": "landscape"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_CH_C007_C004_PSNK_v02_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
-    "label": "China",
-    "description": "Terraced rice paddies cascade down Chinese mountain slopes in warm golden light",
-    "category": "landscape"
-  },
-  {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_C003_C003_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
     "label": "China",
     "description": "A serene Chinese valley unfolds below, with mist clinging to distant mountain peaks",
+    "category": "landscape"
+  },
+  {
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_C004_C003_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
+    "label": "China",
+    "description": "River deltas and farmland patchwork stretch across the vast Chinese plains",
     "category": "landscape"
   },
   {
@@ -112,6 +106,12 @@ var CATALOG = [
     "label": "China",
     "description": "City lights of eastern China glow beneath the ISS in a nighttime orbital pass",
     "category": "space"
+  },
+  {
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_CH_C002_C005_PSNK_v05_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
+    "label": "China",
+    "description": "Rolling green hills and winding rivers of the Chinese countryside from a sweeping aerial pass",
+    "category": "landscape"
   },
   {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_CH_C007_C011_PSNK_v02_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
@@ -126,9 +126,9 @@ var CATALOG = [
     "category": "landscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_C004_C003_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_CH_C007_C004_PSNK_v02_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
     "label": "China",
-    "description": "River deltas and farmland patchwork stretch across the vast Chinese plains",
+    "description": "Terraced rice paddies cascade down Chinese mountain slopes in warm golden light",
     "category": "landscape"
   },
   {
@@ -144,9 +144,15 @@ var CATALOG = [
     "category": "sea"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_DB_D011_C010_PSNK_DENOISE_v19_SDR_PS_20180914_SDR_4K_HEVC.mov",
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_DB_D002_C003_PSNK_v04_SDR_PS_20180914_SDR_4K_HEVC.mov",
     "label": "Dubai",
-    "description": "The glittering skyline of Dubai rises from the desert in a sweeping aerial pass at golden hour",
+    "description": "The Burj Khalifa towers above Dubai's grid of illuminated streets and highways at night",
+    "category": "cityscape"
+  },
+  {
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_DB_D001_C005_COMP_PSNK_v12_SDR_PS_20180912_SDR_4K_HEVC.mov",
+    "label": "Dubai",
+    "description": "Dawn breaks over Dubai's desert skyline, morning sun reflecting off towering glass facades",
     "category": "cityscape"
   },
   {
@@ -156,21 +162,15 @@ var CATALOG = [
     "category": "cityscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_DB_D002_C003_PSNK_v04_SDR_PS_20180914_SDR_4K_HEVC.mov",
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_DB_D011_C010_PSNK_DENOISE_v19_SDR_PS_20180914_SDR_4K_HEVC.mov",
     "label": "Dubai",
-    "description": "The Burj Khalifa towers above Dubai's grid of illuminated streets and highways at night",
+    "description": "The glittering skyline of Dubai rises from the desert in a sweeping aerial pass at golden hour",
     "category": "cityscape"
   },
   {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_DB_D001_C001_PSNK_v06_SDR_PS_20180824_SDR_4K_HEVC.mov",
     "label": "Dubai",
     "description": "Dubai Creek and the old city contrast beautifully with the modern skyline in afternoon light",
-    "category": "cityscape"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_DB_D001_C005_COMP_PSNK_v12_SDR_PS_20180912_SDR_4K_HEVC.mov",
-    "label": "Dubai",
-    "description": "Dawn breaks over Dubai's desert skyline, morning sun reflecting off towering glass facades",
     "category": "cityscape"
   },
   {
@@ -228,15 +228,21 @@ var CATALOG = [
     "category": "landscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_H012_C009_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_H007_C003_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
     "label": "Hawaii",
-    "description": "Volcanic Hawaiian coastline meets crashing Pacific waves in a dramatic aerial sweep",
+    "description": "Hawaiian lava fields meet the ocean in dramatic plumes of steam and ocean mist",
     "category": "landscape"
   },
   {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_H004_C009_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
     "label": "Hawaii",
     "description": "Lush green Hawaiian valleys slope gently down to pristine white sand beaches below",
+    "category": "landscape"
+  },
+  {
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_H012_C009_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
+    "label": "Hawaii",
+    "description": "Volcanic Hawaiian coastline meets crashing Pacific waves in a dramatic aerial sweep",
     "category": "landscape"
   },
   {
@@ -252,15 +258,9 @@ var CATALOG = [
     "category": "landscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_H007_C003_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
-    "label": "Hawaii",
-    "description": "Hawaiian lava fields meet the ocean in dramatic plumes of steam and ocean mist",
-    "category": "landscape"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_HK_B005_C011_PSNK_v16_SDR_PS_20180914_SDR_4K_HEVC.mov",
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/HK_H004_C013_4K_SDR_HEVC.mov",
     "label": "Hong Kong",
-    "description": "Hong Kong's Victoria Harbour glitters between the towers of Kowloon and Hong Kong Island",
+    "description": "The Star Ferry crosses Victoria Harbour as Hong Kong's legendary skyline blazes with neon light",
     "category": "cityscape"
   },
   {
@@ -270,9 +270,9 @@ var CATALOG = [
     "category": "cityscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/HK_H004_C013_4K_SDR_HEVC.mov",
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_HK_B005_C011_PSNK_v16_SDR_PS_20180914_SDR_4K_HEVC.mov",
     "label": "Hong Kong",
-    "description": "The Star Ferry crosses Victoria Harbour as Hong Kong's legendary skyline blazes with neon light",
+    "description": "Hong Kong's Victoria Harbour glitters between the towers of Kowloon and Hong Kong Island",
     "category": "cityscape"
   },
   {
@@ -288,6 +288,12 @@ var CATALOG = [
     "category": "sea"
   },
   {
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/I003_C004_SDR_4K_HEVC.mov",
+    "label": "Iceland",
+    "description": "Snow-capped Icelandic peaks emerge from a sea of clouds in a majestic aerial sweep",
+    "category": "landscape"
+  },
+  {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/I003_C008_SDR_4K_HEVC.mov",
     "label": "Iceland",
     "description": "Volcanic landscapes and glacial rivers of Iceland stretch out in a breathtaking aerial panorama",
@@ -300,21 +306,15 @@ var CATALOG = [
     "category": "landscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/I004_C014_SDR_4K_HEVC.mov",
-    "label": "Iceland",
-    "description": "Dramatic waterfalls cascade down dark Icelandic basalt cliffs into misty green valleys",
-    "category": "landscape"
-  },
-  {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/I003_C015_SDR_4K_HEVC.mov",
     "label": "Iceland",
     "description": "Black sand beaches and turquoise glacial waters meet along Iceland's wild southern coast",
     "category": "landscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/I003_C004_SDR_4K_HEVC.mov",
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/I004_C014_SDR_4K_HEVC.mov",
     "label": "Iceland",
-    "description": "Snow-capped Icelandic peaks emerge from a sea of clouds in a majestic aerial sweep",
+    "description": "Dramatic waterfalls cascade down dark Icelandic basalt cliffs into misty green valleys",
     "category": "landscape"
   },
   {
@@ -360,28 +360,16 @@ var CATALOG = [
     "category": "space"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_LW_L001_C003__PSNK_DENOISE_v04_SDR_PS_FINAL_20180803_SDR_4K_HEVC.mov",
-    "label": "Liwa",
-    "description": "Towering amber sand dunes of the Liwa desert glow warmly in the low desert sun",
-    "category": "landscape"
-  },
-  {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_LW_L001_C006_PSNK_DENOISE_v02_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
     "label": "Liwa",
     "description": "Rippling dune patterns of Abu Dhabi's Liwa Oasis stretch endlessly to the golden horizon",
     "category": "landscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_L007_C007_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
-    "label": "London",
-    "description": "The Thames winds through London past Big Ben and the Houses of Parliament at atmospheric dusk",
-    "category": "cityscape"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_L012_c002_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
-    "label": "London",
-    "description": "London's financial district and Tower Bridge glow warmly in early evening light",
-    "category": "cityscape"
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_LW_L001_C003__PSNK_DENOISE_v04_SDR_PS_FINAL_20180803_SDR_4K_HEVC.mov",
+    "label": "Liwa",
+    "description": "Towering amber sand dunes of the Liwa desert glow warmly in the low desert sun",
+    "category": "landscape"
   },
   {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_L010_C006_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
@@ -396,9 +384,15 @@ var CATALOG = [
     "category": "cityscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_LA_A008_C004_ALTB_ED_FROM_FLAME_RETIME_v46_SDR_PS_20180917_SDR_4K_HEVC.mov",
-    "label": "Los Angeles",
-    "description": "Downtown Los Angeles skyline glows at dusk with the San Gabriel Mountains rising beyond",
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_L007_C007_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
+    "label": "London",
+    "description": "The Thames winds through London past Big Ben and the Houses of Parliament at atmospheric dusk",
+    "category": "cityscape"
+  },
+  {
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_L012_c002_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
+    "label": "London",
+    "description": "London's financial district and Tower Bridge glow warmly in early evening light",
     "category": "cityscape"
   },
   {
@@ -408,15 +402,15 @@ var CATALOG = [
     "category": "cityscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_LA_A011_C003_DGRN_LNFIX_STAB_v57_SDR_PS_20181002_SDR_4K_HEVC.mov",
+    "url": "http://sylvan.apple.com/Videos/comp_LA_A009_C009_PSNK_v02_SDR_PS_FINAL_20180709_SDR_2K_AVC.mov",
     "label": "Los Angeles",
-    "description": "A sweeping pass over Los Angeles from Griffith Observatory all the way to Santa Monica Pier",
-    "category": "cityscape"
+    "description": "Los Angeles",
+    "category": "landscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_LA_A006_C004_v01_SDR_FINAL_PS_20180730_SDR_4K_HEVC.mov",
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_LA_A008_C004_ALTB_ED_FROM_FLAME_RETIME_v46_SDR_PS_20180917_SDR_4K_HEVC.mov",
     "label": "Los Angeles",
-    "description": "Traffic flows along LA's iconic freeways as the sprawling city transitions from day to night",
+    "description": "Downtown Los Angeles skyline glows at dusk with the San Gabriel Mountains rising beyond",
     "category": "cityscape"
   },
   {
@@ -426,21 +420,33 @@ var CATALOG = [
     "category": "cityscape"
   },
   {
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_LA_A006_C004_v01_SDR_FINAL_PS_20180730_SDR_4K_HEVC.mov",
+    "label": "Los Angeles",
+    "description": "Traffic flows along LA's iconic freeways as the sprawling city transitions from day to night",
+    "category": "cityscape"
+  },
+  {
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_LA_A011_C003_DGRN_LNFIX_STAB_v57_SDR_PS_20181002_SDR_4K_HEVC.mov",
+    "label": "Los Angeles",
+    "description": "A sweeping pass over Los Angeles from Griffith Observatory all the way to Santa Monica Pier",
+    "category": "cityscape"
+  },
+  {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_LA_A009_C009_PSNK_v02_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
     "label": "Los Angeles",
     "description": "The LA skyline is silhouetted against a vibrant Pacific sunset in rich orange and purple hues",
     "category": "cityscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_N013_C004_PS_v01_SDR_PS_20180925_F1970F7193_SDR_4K_HEVC.mov",
-    "label": "New York",
-    "description": "The Empire State Building and Manhattan's skyline pierce through dramatic low clouds",
-    "category": "cityscape"
-  },
-  {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_N008_C009_PS_v01_SDR_PS_20180925_SDR_4K_HEVC.mov",
     "label": "New York",
     "description": "A slow aerial pass over Central Park — an emerald rectangle surrounded by Manhattan's towers",
+    "category": "cityscape"
+  },
+  {
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_N013_C004_PS_v01_SDR_PS_20180925_F1970F7193_SDR_4K_HEVC.mov",
+    "label": "New York",
+    "description": "The Empire State Building and Manhattan's skyline pierce through dramatic low clouds",
     "category": "cityscape"
   },
   {
@@ -540,9 +546,9 @@ var CATALOG = [
     "category": "space"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_A013_C012_0122D6_CC_v01_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_A007_C017_01156B_v02_SDR_PS_20180925_SDR_4K_HEVC.mov",
     "label": "San Francisco",
-    "description": "The Golden Gate Bridge emerges from iconic fog as the camera sweeps over San Francisco Bay",
+    "description": "San Francisco at night — the Bay Bridge lit in white against the dark waters of the bay",
     "category": "cityscape"
   },
   {
@@ -552,21 +558,15 @@ var CATALOG = [
     "category": "cityscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_A006_C003_1219EE_CC_v01_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
-    "label": "San Francisco",
-    "description": "The San Francisco waterfront stretches from the Embarcadero to Fisherman's Wharf",
-    "category": "cityscape"
-  },
-  {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_1223LV_FLARE_v21_SDR_PS_FINAL_20180709_F0F5700_SDR_4K_HEVC.mov",
     "label": "San Francisco",
     "description": "A cinematic aerial pass over San Francisco from Twin Peaks to the gleaming Bay Bridge",
     "category": "cityscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_A008_C007_011550_CC_v01_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_A013_C012_0122D6_CC_v01_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
     "label": "San Francisco",
-    "description": "Fog rolls dramatically through the Golden Gate as San Francisco's skyline glows at dusk",
+    "description": "The Golden Gate Bridge emerges from iconic fog as the camera sweeps over San Francisco Bay",
     "category": "cityscape"
   },
   {
@@ -576,9 +576,15 @@ var CATALOG = [
     "category": "cityscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_A007_C017_01156B_v02_SDR_PS_20180925_SDR_4K_HEVC.mov",
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_A006_C003_1219EE_CC_v01_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
     "label": "San Francisco",
-    "description": "San Francisco at night — the Bay Bridge lit in white against the dark waters of the bay",
+    "description": "The San Francisco waterfront stretches from the Embarcadero to Fisherman's Wharf",
+    "category": "cityscape"
+  },
+  {
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/comp_A008_C007_011550_CC_v01_SDR_PS_FINAL_20180709_SDR_4K_HEVC.mov",
+    "label": "San Francisco",
+    "description": "Fog rolls dramatically through the Golden Gate as San Francisco's skyline glows at dusk",
     "category": "cityscape"
   },
   {
@@ -588,15 +594,15 @@ var CATALOG = [
     "category": "landscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/S006_C007_SDR_4K_HEVC.mov",
-    "label": "Scotland",
-    "description": "Rolling green hills and ancient castles of the Scottish countryside unfold from above",
-    "category": "landscape"
-  },
-  {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/S005_C015_SDR_4K_HEVC.mov",
     "label": "Scotland",
     "description": "Dramatic Scottish coastline where dark cliffs meet the churning grey North Sea",
+    "category": "landscape"
+  },
+  {
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/S006_C007_SDR_4K_HEVC.mov",
+    "label": "Scotland",
+    "description": "Rolling green hills and ancient castles of the Scottish countryside unfold from above",
     "category": "landscape"
   },
   {
@@ -642,18 +648,6 @@ var CATALOG = [
     "category": "space"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/Y004_C015_SDR_4K_HEVC.mov",
-    "label": "Yosemite",
-    "description": "El Capitan and Half Dome catch the first golden light of day in Yosemite Valley",
-    "category": "landscape"
-  },
-  {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/Y005_C003_SDR_4K_HEVC.mov",
-    "label": "Yosemite",
-    "description": "Morning mist swirls through Yosemite Valley as sheer granite walls rise on both sides",
-    "category": "landscape"
-  },
-  {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/Y002_C013_SDR_4K_HEVC.mov",
     "label": "Yosemite",
     "description": "Yosemite Falls cascades down massive granite cliffs in a breathtaking aerial sweep",
@@ -666,15 +660,27 @@ var CATALOG = [
     "category": "landscape"
   },
   {
-    "url": "http://sylvan.apple.com/Aerials/2x/Videos/Y011_C001_SDR_4K_HEVC.mov",
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/Y004_C015_SDR_4K_HEVC.mov",
     "label": "Yosemite",
-    "description": "Snow blankets Yosemite's high country, Tenaya Lake frozen in the shadow of Half Dome",
+    "description": "El Capitan and Half Dome catch the first golden light of day in Yosemite Valley",
+    "category": "landscape"
+  },
+  {
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/Y005_C003_SDR_4K_HEVC.mov",
+    "label": "Yosemite",
+    "description": "Morning mist swirls through Yosemite Valley as sheer granite walls rise on both sides",
     "category": "landscape"
   },
   {
     "url": "http://sylvan.apple.com/Aerials/2x/Videos/Y009_C015_SDR_4K_HEVC.mov",
     "label": "Yosemite",
     "description": "Sunset paints the granite walls of Yosemite in warm shades of orange, amber, and gold",
+    "category": "landscape"
+  },
+  {
+    "url": "http://sylvan.apple.com/Aerials/2x/Videos/Y011_C001_SDR_4K_HEVC.mov",
+    "label": "Yosemite",
+    "description": "Snow blankets Yosemite's high country, Tenaya Lake frozen in the shadow of Half Dome",
     "category": "landscape"
   },
   {

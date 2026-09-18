@@ -4,18 +4,22 @@ const vm = require('vm');
 const assert = require('assert');
 
 function boot() {
-  const timers = [];
+  const timers = new Map();
+  let nextTimerId = 1;
   const opened = [];
   let listener = null;
   const el = () => ({ classList: { add() {}, remove() {} }, appendChild() {}, set textContent(v) {} });
   const ctx = {
     console,
     CATALOG: [0, 1, 2, 3, 4].map(i => ({ url: 'http://x/v' + i + '.mov', label: 'L' + i, description: '', category: i < 3 ? 'sea' : 'space' })),
-    localStorage: { getItem: () => null, setItem() {} },
+    localStorage: (() => {
+      const store = new Map();
+      return { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) };
+    })(),
     document: { getElementById: el, addEventListener() {}, createElement: el, createTextNode() {} },
     Image: function () {},
-    setTimeout: fn => timers.push(fn),
-    clearTimeout() {},
+    setTimeout: fn => { const id = nextTimerId++; timers.set(id, fn); return id; },
+    clearTimeout: id => timers.delete(id),
     tizen: { tvinputdevice: { registerKey() {} }, application: {} },
     webapis: {
       avplay: {
@@ -30,7 +34,9 @@ function boot() {
   for (const f of ['settings', 'player', 'menu']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../js', f + '.js'), 'utf8'), ctx);
   }
-  const flush = () => { while (timers.length) timers.shift()(); };
+  const flush = () => {
+    for (const [id, fn] of [...timers]) { timers.delete(id); fn(); }
+  };
   return { ctx, opened, flush, listener: () => listener };
 }
 
@@ -113,4 +119,49 @@ function boot() {
   assert.strictEqual(t.ctx.settings.videoOrder, 'sequential', 'settings must load back from tizen.preference');
 }
 
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  t.flush();
+  t.flush();
+  t.flush();
+  assert.deepStrictEqual(
+    t.opened,
+    ['http://x/v0.mov', 'http://x/v0.mov'],
+    'a stream that never reports buffering must be retried, not left hanging'
+  );
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  t.flush();
+  t.listener().onbufferingcomplete();
+  t.flush();
+  t.flush();
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov'], 'buffering completion must cancel the watchdog');
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); settings.descriptionTimer = 99; saveSettings(); settings = {}; loadSettings();", t.ctx);
+  assert.strictEqual(t.ctx.settings.descriptionTimer, 15, 'a stored timer above the maximum must clamp on load');
+  vm.runInContext("settings.descriptionTimer = -5; saveSettings(); settings = {}; loadSettings();", t.ctx);
+  assert.strictEqual(t.ctx.settings.descriptionTimer, 1, 'a stored timer below the minimum must clamp on load');
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  t.flush();
+  const stale = t.listener();
+  stale.onerror('first');
+  stale.onerror('duplicate');
+  t.flush();
+  t.listener().onbufferingcomplete();
+  stale.onerror('late');
+  t.flush();
+  t.flush();
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v0.mov'], 'duplicate and stale errors must not retry the current stream');
+}
 console.log('player tests passed');

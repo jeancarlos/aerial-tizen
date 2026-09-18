@@ -1,4 +1,5 @@
 #!/bin/bash
+set -uo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="$DIR/.env"
@@ -20,7 +21,7 @@ export PATH="$TIZEN_PATH/tools/ide/bin:$TIZEN_PATH/tools:$PATH"
 # Connect to TV
 echo ""
 read -rp "TV IP address [${TV_IP:-}]: " input
-TV_IP="${input:-$TV_IP}"
+TV_IP="${input:-${TV_IP:-}}"
 
 if [ -z "$TV_IP" ]; then
   echo "Error: TV IP is required."
@@ -29,14 +30,19 @@ fi
 
 echo ""
 echo "Connecting to $TV_IP..."
-sdb connect "$TV_IP":26101 2>&1
+if ! CONNECT_OUTPUT=$(sdb connect "$TV_IP":26101 2>&1) ||
+   ! grep -Eq '^(already )?connected to ' <<< "$CONNECT_OUTPUT"; then
+  printf '%s\n' "$CONNECT_OUTPUT" >&2
+  echo "Error: sdb could not connect to $TV_IP:26101. Is the TV on with developer mode enabled?" >&2
+  exit 1
+fi
 
 echo ""
 echo "Available devices:"
 sdb devices 2>/dev/null | tail -n +2
 echo ""
 read -rp "TV name [${TV_NAME:-}]: " input
-TV_NAME="${input:-$TV_NAME}"
+TV_NAME="${input:-${TV_NAME:-}}"
 
 if [ -z "$TV_NAME" ]; then
   echo "Error: TV name is required."
@@ -51,7 +57,7 @@ DETECTED_DUID=$(sdb -s "$TV_NAME" shell 0 getduid 2>/dev/null | tr -d '[:space:]
 if [ -n "$DETECTED_DUID" ]; then
   DUID="$DETECTED_DUID"
   echo "DUID: $DUID"
-elif [ -n "$DUID" ]; then
+elif [ -n "${DUID:-}" ]; then
   echo "Using saved DUID: $DUID"
 else
   read -rp "Enter DUID manually: " DUID
@@ -66,14 +72,14 @@ read -rp "Security profile name [${PROFILE:-AerialProfile}]: " input
 PROFILE="${input:-${PROFILE:-AerialProfile}}"
 
 # Write .env
-cat > "$ENV_FILE" <<EOF
-TV_IP=$TV_IP
-TV_NAME=$TV_NAME
-DUID=$DUID
-TIZEN_PATH=$TIZEN_PATH
-TIZEN_DATA=$TIZEN_DATA
-PROFILE=$PROFILE
-EOF
+{
+  printf 'TV_IP=%q\n' "$TV_IP"
+  printf 'TV_NAME=%q\n' "$TV_NAME"
+  printf 'DUID=%q\n' "$DUID"
+  printf 'TIZEN_PATH=%q\n' "$TIZEN_PATH"
+  printf 'TIZEN_DATA=%q\n' "$TIZEN_DATA"
+  printf 'PROFILE=%q\n' "$PROFILE"
+} > "$ENV_FILE"
 
 echo ""
 echo "Saved to .env:"

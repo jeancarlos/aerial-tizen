@@ -1,12 +1,14 @@
 var PRELOAD_FADE_MS = 500;
 var ERROR_SKIP_MS = 2000;
 var RETRY_DELAYS_MS = [1000, 3000];
+var BUFFER_TIMEOUT_MS = 20000;
 
 var playlist = [];
 var playlistIndex = -1;
 var videoIndex = -1;
 var nextIndex = -1;
 var playToken = 0;
+var menuOpen = false;
 var infoTimer = null;
 
 var avplay = webapis.avplay;
@@ -134,6 +136,7 @@ function startVideo(index, token) {
   var urls = getVideoUrls(index);
   var urlIndex = 0;
   var retry = 0;
+  var attempt = 0;
 
   function failed() {
     if (token !== playToken) return;
@@ -152,7 +155,28 @@ function startVideo(index, token) {
 
   function tryPlay() {
     if (token !== playToken) return;
+    var currentAttempt = ++attempt;
+    var settled = false;
     var prepared = false;
+    var watchdog = null;
+
+    function clearWatchdog() {
+      if (watchdog) clearTimeout(watchdog);
+      watchdog = null;
+    }
+
+    function active() {
+      return token === playToken && currentAttempt === attempt && !settled;
+    }
+
+    function failAttempt(error) {
+      if (!active()) return;
+      settled = true;
+      clearWatchdog();
+      console.warn("AVPlay failure", urls[urlIndex], String(error || "buffer timeout"));
+      failed();
+    }
+
     try {
       stopAndClose();
       avplay.open(urls[urlIndex]);
@@ -160,29 +184,34 @@ function startVideo(index, token) {
       try { avplay.setStreamingProperty('SET_MODE_4K', 'TRUE'); } catch (e) {}
       avplay.setListener({
         onbufferingcomplete: function () {
-          if (token !== playToken) return;
+          if (!active()) return;
+          clearWatchdog();
           hidePreload();
           scheduleHideInfo();
           prefetchNextThumbnail();
         },
         onstreamcompleted: function () {
-          if (token === playToken) playVideo(takeNext());
+          if (active()) { clearWatchdog(); playVideo(takeNext()); }
         },
-        onerror: function () {
-          if (prepared) failed();
+        onerror: function (error) {
+          if (!prepared) return;
+          failAttempt(error);
         }
       });
       avplay.prepareAsync(function () {
-        if (token !== playToken) return;
+        if (!active()) return;
         prepared = true;
+        watchdog = setTimeout(function () {
+          failAttempt();
+        }, BUFFER_TIMEOUT_MS);
         try {
           avplay.play();
         } catch (e) {
-          failed();
+          failAttempt(e);
         }
-      }, failed);
+      }, failAttempt);
     } catch (e) {
-      failed();
+      failAttempt(e);
     }
   }
 

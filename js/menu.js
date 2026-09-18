@@ -1,4 +1,3 @@
-var menuOpen = false;
 var menuIndex = 0;
 
 var menuEl = document.getElementById('menu');

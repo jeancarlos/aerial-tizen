@@ -77,7 +77,7 @@ document.addEventListener('keydown', function (e) {
 
 document.addEventListener('visibilitychange', function () {
   if (document.hidden) stopPlayback();
-  else if (videoIndex >= 0) playVideo(videoIndex);
+  else playVideo(videoIndex >= 0 ? videoIndex : takeNext());
 });
 
 loadSettings();

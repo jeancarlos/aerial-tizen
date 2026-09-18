@@ -4,7 +4,7 @@ var DEFAULT_SETTINGS = {
   videoOrder: 'shuffle',
   category: 'all',
   customServerEnabled: false,
-  customServerUrl: 'http://192.168.1.200:8090',
+  customServerUrl: 'http://192.168.0.100:8090',
   devMode: false
 };
 
@@ -87,6 +87,16 @@ function loadSettings() {
     if (DEFAULT_SETTINGS.hasOwnProperty(key)) {
       settings[key] = typeof parsed[key] === typeof DEFAULT_SETTINGS[key] ? parsed[key] : DEFAULT_SETTINGS[key];
     }
+  }
+  clampSettings();
+}
+
+function clampSettings() {
+  for (var i = 0; i < MENU_ITEMS.length; i++) {
+    var item = MENU_ITEMS[i];
+    if (item.type !== 'number') continue;
+    if (settings[item.key] < item.min) settings[item.key] = item.min;
+    if (settings[item.key] > item.max) settings[item.key] = item.max;
   }
 }
 
