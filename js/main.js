@@ -90,6 +90,8 @@ buildPlaylist();
 
 var savedIndex = parseInt(storageGet('aerial_index'), 10);
 playlistIndex = playlist.indexOf(savedIndex);
+telemetryProbe();
+
 telemetry('app_start', {
   catalog_size: CATALOG.length,
   category: settings.category,

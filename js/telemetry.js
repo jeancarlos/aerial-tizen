@@ -43,6 +43,18 @@ function telemetryFlush() {
   telemetrySend(batch);
 }
 
+function telemetryProbe() {
+  var base = (typeof AERIAL_PROBE_URL !== 'undefined') ? AERIAL_PROBE_URL : '';
+  if (!base) return;
+  // An <img> request needs no CORS grant and no XHR, so this reaches a plain
+  // file server and lands in its access log even when it 404s.
+  var url = base + '/aerial-probe.gif?t=' + Date.now();
+  try {
+    new Image().src = url;
+  } catch (e) {}
+  console.warn('[telemetry] probe sent to', url);
+}
+
 function telemetry(event, fields) {
   var payload = {
     ddsource: 'tizen',
