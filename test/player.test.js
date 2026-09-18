@@ -248,4 +248,18 @@ function boot() {
   assert.ok(['http://x/v3.mov', 'http://x/v4.mov'].includes(t.opened[before]), 'the restarted video must come from the new category: ' + t.opened[before]);
 }
 
+{
+  const t = boot();
+  let pending = null;
+  vm.runInContext("loadSettings(); settings.devMode = true; buildPlaylist(); openMenu();", t.ctx);
+  t.ctx.testConnection = (url, cb) => { pending = cb; };
+  vm.runInContext("menuIndex = getVisibleMenuItems().findIndex(function (i) { return i.key === 'customServerEnabled'; }); settings.customServerEnabled = false; menuChangeValue(1);", t.ctx);
+  assert.strictEqual(t.ctx.menuBusyKey, 'customServerEnabled', 'the row must show a busy state while the test runs');
+  vm.runInContext("menuChangeValue(1); menuChangeValue(-1);", t.ctx);
+  assert.ok(pending, 'no second test may start while one is pending');
+  pending(true);
+  assert.strictEqual(t.ctx.menuBusyKey, null, 'the busy state must clear when the test finishes');
+  assert.strictEqual(t.ctx.settings.customServerEnabled, true, 'a successful test must enable the server');
+}
+
 console.log('player tests passed');

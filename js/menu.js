@@ -1,4 +1,5 @@
 var menuIndex = 0;
+var menuBusyKey = null;
 
 var menuEl = document.getElementById('menu');
 var menuItemsEl = document.getElementById('menu-items');
@@ -21,6 +22,9 @@ function createMenuItemEl(item, isActive) {
     display = value + item.suffix;
   }
 
+  var busy = menuBusyKey === item.key;
+  if (busy) display = 'testing…';
+
   var row = document.createElement('div');
   row.className = 'menu-item' + (isActive ? ' active' : '');
 
@@ -33,11 +37,11 @@ function createMenuItemEl(item, isActive) {
 
   var arrowL = document.createElement('span');
   arrowL.className = 'menu-arrow';
-  arrowL.textContent = item.type === 'text' ? '' : '◀ ';
+  arrowL.textContent = (item.type === 'text' || busy) ? '' : '◀ ';
 
   var arrowR = document.createElement('span');
   arrowR.className = 'menu-arrow';
-  arrowR.textContent = item.type === 'text' ? '' : ' ▶';
+  arrowR.textContent = (item.type === 'text' || busy) ? '' : ' ▶';
 
   val.appendChild(arrowL);
   val.appendChild(document.createTextNode(display));
@@ -117,6 +121,7 @@ function applySetting(key, value) {
 }
 
 function menuChangeValue(direction) {
+  if (menuBusyKey) return;
   var item = getVisibleMenuItems()[menuIndex];
   var current = settings[item.key];
 
@@ -128,9 +133,12 @@ function menuChangeValue(direction) {
     var nextValue = item.options[(idx + direction + item.options.length) % item.options.length].value;
 
     if (item.key === 'customServerEnabled' && nextValue === true) {
+      menuBusyKey = item.key;
+      renderMenu();
       testConnection(settings.customServerUrl, function (success) {
-        if (!success) alert('Could not reach custom server. Test failed.');
+        menuBusyKey = null;
         applySetting(item.key, success);
+        if (!success) alert('Could not reach custom server. Test failed.');
       });
       return;
     }
@@ -143,9 +151,16 @@ function menuChangeValue(direction) {
   } else if (item.type === 'text') {
     var newVal = prompt('Enter files location URL', current);
     if (!newVal) return;
+    menuBusyKey = item.key;
+    renderMenu();
     testConnection(newVal, function (success) {
-      if (success) applySetting(item.key, newVal);
-      else alert('Could not reach ' + newVal + '. URL not updated.');
+      menuBusyKey = null;
+      if (success) {
+        applySetting(item.key, newVal);
+      } else {
+        renderMenu();
+        alert('Could not reach ' + newVal + '. URL not updated.');
+      }
     });
   }
 }

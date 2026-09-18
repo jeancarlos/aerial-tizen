@@ -16,6 +16,8 @@ html, body {
 
 #preload {
   position: fixed;
+  filter: blur(18px);
+  transform: scale(1.06);
   top: 0;
   left: 0;
   width: 1920px;
