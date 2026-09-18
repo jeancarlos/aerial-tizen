@@ -117,10 +117,11 @@ function stopPlayback() {
 
 function getVideoUrls(index) {
   var url = CATALOG[index].url;
+  var fallback = [url, url.replace('http://', 'https://')];
   if (settings.devMode && settings.customServerEnabled) {
-    return [joinUrl(settings.customServerUrl, fileName(url))];
+    return [joinUrl(settings.customServerUrl, fileName(url))].concat(fallback);
   }
-  return [url, url.replace('http://', 'https://')];
+  return fallback;
 }
 
 function skipAfterError() {
@@ -165,6 +166,13 @@ function startVideo(index, token) {
       watchdog = null;
     }
 
+    function armWatchdog() {
+      clearWatchdog();
+      watchdog = setTimeout(function () {
+        failAttempt();
+      }, BUFFER_TIMEOUT_MS);
+    }
+
     function active() {
       return token === playToken && currentAttempt === attempt && !settled;
     }
@@ -183,6 +191,9 @@ function startVideo(index, token) {
       avplay.setDisplayRect(0, 0, 1920, 1080);
       try { avplay.setStreamingProperty('SET_MODE_4K', 'TRUE'); } catch (e) {}
       avplay.setListener({
+        onbufferingstart: function () {
+          if (active()) armWatchdog();
+        },
         onbufferingcomplete: function () {
           if (!active()) return;
           clearWatchdog();
@@ -198,12 +209,11 @@ function startVideo(index, token) {
           failAttempt(error);
         }
       });
+      armWatchdog();
       avplay.prepareAsync(function () {
         if (!active()) return;
         prepared = true;
-        watchdog = setTimeout(function () {
-          failAttempt();
-        }, BUFFER_TIMEOUT_MS);
+        armWatchdog();
         try {
           avplay.play();
         } catch (e) {

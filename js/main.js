@@ -81,6 +81,11 @@ document.addEventListener('visibilitychange', function () {
 });
 
 loadSettings();
+
+if (!CATALOG.length) {
+  throw new Error('CATALOG is empty: js/catalog.js failed to load');
+}
+
 buildPlaylist();
 
 var savedIndex = parseInt(storageGet('aerial_index'), 10);

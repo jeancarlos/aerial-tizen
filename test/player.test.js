@@ -164,4 +164,44 @@ function boot() {
   t.flush();
   assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v0.mov'], 'duplicate and stale errors must not retry the current stream');
 }
+{
+  const t = boot();
+  t.ctx.webapis.avplay.prepareAsync = () => {};
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  t.flush();
+  t.flush();
+  t.flush();
+  assert.deepStrictEqual(
+    t.opened,
+    ['http://x/v0.mov', 'http://x/v0.mov'],
+    'a prepare that never calls back must time out and retry'
+  );
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  t.flush();
+  t.listener().onbufferingcomplete();
+  t.listener().onbufferingstart();
+  t.flush();
+  t.flush();
+  assert.deepStrictEqual(
+    t.opened,
+    ['http://x/v0.mov', 'http://x/v0.mov'],
+    'a stall after playback started must re-arm the watchdog and retry'
+  );
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); settings.devMode = true; settings.customServerEnabled = true; settings.customServerUrl = 'http://lan:8090';", t.ctx);
+  const urls = vm.runInContext("getVideoUrls(0)", t.ctx);
+  assert.deepStrictEqual(
+    [...urls],
+    ['http://lan:8090/v0.mov', 'http://x/v0.mov', 'https://x/v0.mov'],
+    'custom server mode must keep the catalog URL as a fallback'
+  );
+}
+
 console.log('player tests passed');
