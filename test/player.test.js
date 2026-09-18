@@ -262,4 +262,36 @@ function boot() {
   assert.strictEqual(t.ctx.settings.customServerEnabled, true, 'a successful test must enable the server');
 }
 
+{
+  const t = boot();
+  t.ctx.AERIAL_LOCAL_SERVER = 'http://192.168.2.4:8090';
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/settings.js'), 'utf8'), t.ctx);
+  vm.runInContext("settings = {}; localStorage.setItem('aerial_settings', JSON.stringify({customServerEnabled: false, devMode: false, customServerUrl: 'http://192.168.0.100:8090'})); loadSettings();", t.ctx);
+  assert.strictEqual(t.ctx.settings.customServerEnabled, true, 'a shipped server address must beat a stored disabled toggle');
+  assert.strictEqual(t.ctx.settings.customServerUrl, 'http://192.168.2.4:8090', 'and it must beat a stored address');
+  const urls = [...vm.runInContext("getVideoUrls(0)", t.ctx)];
+  assert.ok(urls[0].startsWith('http://192.168.2.4:8090/'), 'the LAN URL must be tried first: ' + urls[0]);
+  assert.ok(urls.length > 1, 'with the catalog URL kept as a fallback');
+}
+
+{
+  const t = boot();
+  let state = 'PLAYING';
+  t.ctx.webapis.avplay.getState = () => state;
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  t.flush();
+  state = 'PAUSED';
+  t.flush();
+  t.flush();
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov'], 'a paused video must not be restarted by the watchdog');
+  state = 'PLAYING';
+  t.flush();
+  t.flush();
+  assert.deepStrictEqual(
+    t.opened,
+    ['http://x/v0.mov', 'http://x/v0.mov'],
+    'but a real stall after resuming must still be caught'
+  );
+}
+
 console.log('player tests passed');

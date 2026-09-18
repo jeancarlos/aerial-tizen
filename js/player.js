@@ -171,6 +171,14 @@ function startVideo(index, token) {
     function armWatchdog() {
       clearWatchdog();
       watchdog = setTimeout(function () {
+        // A paused video is not a stall: the viewer asked for it to stop
+        // making progress. Keep watching instead of restarting playback.
+        var paused = false;
+        try { paused = avplay.getState() === 'PAUSED'; } catch (e) {}
+        if (paused) {
+          armWatchdog();
+          return;
+        }
         failAttempt();
       }, BUFFER_TIMEOUT_MS);
     }

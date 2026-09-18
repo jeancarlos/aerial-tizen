@@ -91,7 +91,11 @@ function loadSettings() {
     }
   }
   if (LOCAL_SERVER) {
+    // A deployment that ships a server address means to use it: the stored
+    // toggle would otherwise keep a failed test from an older build.
     settings.customServerUrl = LOCAL_SERVER;
+    settings.customServerEnabled = true;
+    settings.devMode = true;
   }
   clampSettings();
 }
