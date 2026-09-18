@@ -1,4 +1,5 @@
 *.wgt
+js/local-config.js
 .manifest.tmp
 .delta.lst
 author-signature.xml

@@ -99,7 +99,10 @@ function applySetting(key, value) {
   settings[key] = value;
   saveSettings();
 
-  if (key === 'category' || key === 'videoOrder') buildPlaylist();
+  if (key === 'category' || key === 'videoOrder') {
+    buildPlaylist();
+    playVideo(takeNext());
+  }
 
   if (key === 'showDescription') {
     if (value && videoIndex >= 0) {

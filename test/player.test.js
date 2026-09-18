@@ -31,13 +31,15 @@ function boot() {
     }
   };
   vm.createContext(ctx);
-  for (const f of ['settings', 'player', 'menu']) {
+  for (const f of ['telemetry', 'settings', 'player', 'menu']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../js', f + '.js'), 'utf8'), ctx);
   }
   const flush = () => {
     for (const [id, fn] of [...timers]) { timers.delete(id); fn(); }
   };
-  return { ctx, opened, flush, listener: () => listener };
+  const events = [];
+  ctx.telemetry = (event, fields) => events.push([event, fields || {}]);
+  return { ctx, opened, flush, events, listener: () => listener };
 }
 
 {
@@ -202,6 +204,48 @@ function boot() {
     ['http://lan:8090/v0.mov', 'http://x/v0.mov', 'https://x/v0.mov'],
     'custom server mode must keep the catalog URL as a fallback'
   );
+}
+
+{
+  const t = boot();
+  const fails = [];
+  t.ctx.webapis.avplay.prepareAsync = (ok, fail) => fails.push(fail);
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  t.flush();
+  fails[0]();
+  const failure = t.events.find(([e]) => e === 'avplay_failure' || e === 'watchdog_timeout');
+  assert.ok(failure, 'a failed attempt must emit a telemetry event: ' + JSON.stringify(t.events));
+  assert.strictEqual(failure[1].url, 'http://x/v0.mov', 'the event must name the URL that failed');
+  assert.ok(failure[1].reason, 'the event must carry a reason');
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings();", t.ctx);
+  assert.strictEqual(t.ctx.telemetryEnabled(), false, 'telemetry must stay off without a configured client token');
+}
+
+{
+  const t = boot();
+  t.ctx.AERIAL_LOCAL_SERVER = 'http://192.168.2.4:8090';
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/settings.js'), 'utf8'), t.ctx);
+  vm.runInContext("settings = {}; localStorage.setItem('aerial_settings', JSON.stringify({customServerUrl: 'http://192.168.0.100:8090'})); loadSettings();", t.ctx);
+  assert.strictEqual(
+    t.ctx.settings.customServerUrl,
+    'http://192.168.2.4:8090',
+    'the deployed server address must override a stored one'
+  );
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  t.flush();
+  const before = t.opened.length;
+  vm.runInContext("applySetting('category', 'space');", t.ctx);
+  t.flush();
+  assert.strictEqual(t.opened.length, before + 1, 'changing category must restart playback');
+  assert.ok(['http://x/v3.mov', 'http://x/v4.mov'].includes(t.opened[before]), 'the restarted video must come from the new category: ' + t.opened[before]);
 }
 
 console.log('player tests passed');

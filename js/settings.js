@@ -1,11 +1,13 @@
+var LOCAL_SERVER = (typeof AERIAL_LOCAL_SERVER !== 'undefined') ? AERIAL_LOCAL_SERVER : '';
+
 var DEFAULT_SETTINGS = {
   showDescription: true,
   descriptionTimer: 3,
   videoOrder: 'shuffle',
   category: 'all',
-  customServerEnabled: false,
-  customServerUrl: 'http://192.168.0.100:8090',
-  devMode: false
+  customServerEnabled: !!LOCAL_SERVER,
+  customServerUrl: LOCAL_SERVER || 'http://192.168.0.100:8090',
+  devMode: !!LOCAL_SERVER
 };
 
 var MENU_ITEMS = [
@@ -87,6 +89,9 @@ function loadSettings() {
     if (DEFAULT_SETTINGS.hasOwnProperty(key)) {
       settings[key] = typeof parsed[key] === typeof DEFAULT_SETTINGS[key] ? parsed[key] : DEFAULT_SETTINGS[key];
     }
+  }
+  if (LOCAL_SERVER) {
+    settings.customServerUrl = LOCAL_SERVER;
   }
   clampSettings();
 }

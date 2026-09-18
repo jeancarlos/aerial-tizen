@@ -125,6 +125,7 @@ function getVideoUrls(index) {
 }
 
 function skipAfterError() {
+  telemetry('video_skipped', { video: videoIndex >= 0 && CATALOG[videoIndex] ? CATALOG[videoIndex].label : '' });
   stopPlayback();
   var token = playToken;
   setTimeout(function () {
@@ -160,6 +161,7 @@ function startVideo(index, token) {
     var settled = false;
     var prepared = false;
     var watchdog = null;
+    var attemptStarted = Date.now();
 
     function clearWatchdog() {
       if (watchdog) clearTimeout(watchdog);
@@ -181,7 +183,14 @@ function startVideo(index, token) {
       if (!active()) return;
       settled = true;
       clearWatchdog();
-      console.warn("AVPlay failure", urls[urlIndex], String(error || "buffer timeout"));
+      telemetry(prepared ? 'avplay_failure' : 'watchdog_timeout', {
+        url: urls[urlIndex],
+        url_index: urlIndex,
+        attempt: currentAttempt,
+        retry: retry,
+        video: CATALOG[index] ? CATALOG[index].label : '',
+        reason: String(error || 'buffer timeout')
+      });
       failed();
     }
 
@@ -197,6 +206,11 @@ function startVideo(index, token) {
         onbufferingcomplete: function () {
           if (!active()) return;
           clearWatchdog();
+          telemetry('buffering_complete', {
+            url: urls[urlIndex],
+            video: CATALOG[index] ? CATALOG[index].label : '',
+            startup_ms: Date.now() - attemptStarted
+          });
           hidePreload();
           scheduleHideInfo();
           prefetchNextThumbnail();
