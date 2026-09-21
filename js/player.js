@@ -123,6 +123,7 @@ function stopAndClose() {
 
 function stopPlayback() {
   playToken++;
+  clearWatchdog();
   stopAndClose();
 }
 
@@ -144,135 +145,145 @@ function skipAfterError() {
   }, ERROR_SKIP_MS);
 }
 
+// ── Playback ──
+//
+// A session is one video: the URL list to walk and the retry budget spent on
+// each. A run is one avplay.open of one URL inside that session. Only the
+// newest run of the newest session is live — playToken retires a session,
+// currentRun retires a run — so every callback below asks runIsLive() before
+// touching anything shared.
+
+var currentRun = null;
+var watchdogTimer = null;
+
 function startVideo(index, token) {
   showInfo(index);
-  var urls = getVideoUrls(index);
-  var urlIndex = 0;
-  var retry = 0;
-  var attempt = 0;
+  tryPlay({ index: index, token: token, urls: getVideoUrls(index), urlIndex: 0, retry: 0, attempt: 0 });
+}
 
-  function failed() {
-    if (token !== playToken) return;
-    if (retry < RETRY_DELAYS_MS.length) {
-      var delay = RETRY_DELAYS_MS[retry++];
-      setTimeout(function () {
-        if (token === playToken) tryPlay();
-      }, delay);
-      return;
-    }
-    retry = 0;
-    urlIndex++;
-    if (urlIndex >= urls.length) skipAfterError();
-    else tryPlay();
+function runIsLive(run) {
+  return run.session.token === playToken && currentRun === run && !run.settled;
+}
+
+function clearWatchdog() {
+  if (watchdogTimer) clearTimeout(watchdogTimer);
+  watchdogTimer = null;
+}
+
+function armWatchdog(run) {
+  if (!runIsLive(run)) return;
+  clearWatchdog();
+  watchdogTimer = setTimeout(function () {
+    // A paused video is not a stall: the viewer asked for it to stop making
+    // progress. Keep watching instead of restarting playback.
+    var paused = false;
+    try { paused = avplay.getState() === 'PAUSED'; } catch (e) {}
+    if (paused) armWatchdog(run);
+    else failRun(run, null);
+  }, BUFFER_TIMEOUT_MS);
+}
+
+function failRun(run, error) {
+  if (!runIsLive(run)) return;
+  run.settled = true;
+  clearWatchdog();
+  var s = run.session;
+  telemetry('playback_failure', {
+    phase: run.prepared ? 'playing' : 'preparing',
+    url: s.urls[s.urlIndex],
+    url_index: s.urlIndex,
+    attempt: run.attempt,
+    retry: s.retry,
+    video: CATALOG[s.index] ? CATALOG[s.index].label : '',
+    reason: String(error || 'buffer timeout')
+  });
+  retryOrAdvance(s);
+}
+
+// Retry the same URL on a backoff, then fall through to the next URL, then give
+// up on the video.
+function retryOrAdvance(s) {
+  if (s.token !== playToken) return;
+  if (s.retry < RETRY_DELAYS_MS.length) {
+    var delay = RETRY_DELAYS_MS[s.retry++];
+    setTimeout(function () {
+      if (s.token === playToken) tryPlay(s);
+    }, delay);
+    return;
   }
+  s.retry = 0;
+  s.urlIndex++;
+  if (s.urlIndex >= s.urls.length) skipAfterError();
+  else tryPlay(s);
+}
 
-  function tryPlay() {
-    if (token !== playToken) return;
-    var currentAttempt = ++attempt;
-    var settled = false;
-    var prepared = false;
-    var watchdog = null;
-    var attemptStarted = Date.now();
-
-    function clearWatchdog() {
-      if (watchdog) clearTimeout(watchdog);
-      watchdog = null;
-    }
-
-    function armWatchdog() {
-      clearWatchdog();
-      watchdog = setTimeout(function () {
-        // A paused video is not a stall: the viewer asked for it to stop
-        // making progress. Keep watching instead of restarting playback.
-        var paused = false;
-        try { paused = avplay.getState() === 'PAUSED'; } catch (e) {}
-        if (paused) {
-          armWatchdog();
-          return;
-        }
-        failAttempt();
-      }, BUFFER_TIMEOUT_MS);
-    }
-
-    function active() {
-      return token === playToken && currentAttempt === attempt && !settled;
-    }
-
-    function failAttempt(error) {
-      if (!active()) return;
-      settled = true;
-      clearWatchdog();
-      telemetry('playback_failure', {
-        phase: prepared ? 'playing' : 'preparing',
-        url: urls[urlIndex],
-        url_index: urlIndex,
-        attempt: currentAttempt,
-        retry: retry,
-        video: CATALOG[index] ? CATALOG[index].label : '',
-        reason: String(error || 'buffer timeout')
-      });
-      failed();
-    }
-
-    try {
-      stopAndClose();
-      avplay.open(urls[urlIndex]);
-      avplay.setDisplayRect(0, 0, 1920, 1080);
-      try { avplay.setStreamingProperty('SET_MODE_4K', 'TRUE'); } catch (e) {}
-      avplay.setListener({
-        onbufferingstart: function () {
-          if (!active()) return;
-          rebufferCount++;
-          telemetry('rebuffer_start', { video: CATALOG[index] ? CATALOG[index].label : '', count: rebufferCount });
-          armWatchdog();
-        },
-        onbufferingcomplete: function () {
-          if (!active()) return;
-          clearWatchdog();
-          hideLoading();
-          if (!transitionReported) {
-            transitionReported = true;
-            telemetry('transition_ms', {
-              url: urls[urlIndex],
-              video: CATALOG[index] ? CATALOG[index].label : '',
-              ms: Date.now() - transitionStartedAt
-            });
-          } else {
-            telemetry('rebuffer_end', {
-              video: CATALOG[index] ? CATALOG[index].label : '',
-              count: rebufferCount,
-              ms: Date.now() - attemptStarted
-            });
-          }
-          hidePreload();
-          scheduleHideInfo();
-          prefetchNextThumbnail();
-        },
-        onstreamcompleted: function () {
-          if (active()) { clearWatchdog(); playVideo(takeNext()); }
-        },
-        onerror: function (error) {
-          if (!prepared) return;
-          failAttempt(error);
-        }
-      });
-      armWatchdog();
-      avplay.prepareAsync(function () {
-        if (!active()) return;
-        prepared = true;
-        armWatchdog();
-        try {
-          avplay.play();
-        } catch (e) {
-          failAttempt(e);
-        }
-      }, failAttempt);
-    } catch (e) {
-      failAttempt(e);
-    }
+function reportBuffered(run) {
+  var s = run.session;
+  var label = CATALOG[s.index] ? CATALOG[s.index].label : '';
+  if (!transitionReported) {
+    transitionReported = true;
+    telemetry('transition_ms', { url: s.urls[s.urlIndex], video: label, ms: Date.now() - transitionStartedAt });
+  } else {
+    telemetry('rebuffer_end', { video: label, count: rebufferCount, ms: Date.now() - run.startedAt });
   }
+}
 
-  tryPlay();
+function playbackListener(run) {
+  var label = CATALOG[run.session.index] ? CATALOG[run.session.index].label : '';
+  return {
+    onbufferingstart: function () {
+      if (!runIsLive(run)) return;
+      rebufferCount++;
+      telemetry('rebuffer_start', { video: label, count: rebufferCount });
+      armWatchdog(run);
+    },
+    onbufferingcomplete: function () {
+      if (!runIsLive(run)) return;
+      clearWatchdog();
+      hideLoading();
+      reportBuffered(run);
+      hidePreload();
+      scheduleHideInfo();
+      prefetchNextThumbnail();
+    },
+    onstreamcompleted: function () {
+      if (!runIsLive(run)) return;
+      clearWatchdog();
+      playVideo(takeNext());
+    },
+    onerror: function (error) {
+      // Until prepareAsync settles, its own failure callback owns the error.
+      if (run.prepared) failRun(run, error);
+    }
+  };
+}
+
+function tryPlay(s) {
+  if (s.token !== playToken) return;
+  var run = { session: s, attempt: ++s.attempt, settled: false, prepared: false, startedAt: Date.now() };
+  currentRun = run;
+  try {
+    stopAndClose();
+    avplay.open(s.urls[s.urlIndex]);
+    avplay.setDisplayRect(0, 0, 1920, 1080);
+    try { avplay.setStreamingProperty('SET_MODE_4K', 'TRUE'); } catch (e) {}
+    avplay.setListener(playbackListener(run));
+    armWatchdog(run);
+    avplay.prepareAsync(function () {
+      if (!runIsLive(run)) return;
+      run.prepared = true;
+      armWatchdog(run);
+      try {
+        avplay.play();
+      } catch (e) {
+        failRun(run, e);
+      }
+    }, function (error) {
+      failRun(run, error);
+    });
+  } catch (e) {
+    failRun(run, e);
+  }
 }
 
 function playVideo(index) {

@@ -6,6 +6,7 @@ const assert = require('assert');
 function boot() {
   const timers = new Map();
   let nextTimerId = 1;
+  let now = 0;
   const opened = [];
   let listener = null;
   const elements = {};
@@ -34,7 +35,7 @@ function boot() {
     })(),
     document: { getElementById: el, addEventListener() {}, createElement: makeEl, createTextNode: () => ({}) },
     Image: function () {},
-    setTimeout: fn => { const id = nextTimerId++; timers.set(id, fn); return id; },
+    setTimeout: (fn, ms) => { const id = nextTimerId++; timers.set(id, { fn, at: now + (ms || 0) }); return id; },
     clearTimeout: id => timers.delete(id),
     tizen: { tvinputdevice: { registerKey() {} }, application: {} },
     webapis: {
@@ -50,40 +51,56 @@ function boot() {
   for (const f of ['storage', 'telemetry', 'settings', 'player', 'menu', 'debug']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../js', f + '.js'), 'utf8'), ctx);
   }
-  const flush = () => {
-    for (const [id, fn] of [...timers]) { timers.delete(id); fn(); }
+  // Virtual clock: a test says how long it waited, and the clock decides what
+  // that was long enough to fire. Adding a setTimeout anywhere in the player no
+  // longer changes what an unrelated test sees.
+  const advance = ms => {
+    const until = now + ms;
+    for (;;) {
+      let due = null;
+      for (const timer of timers) {
+        if (timer[1].at <= until && (due === null || timer[1].at < due[1].at)) due = timer;
+      }
+      if (!due) break;
+      timers.delete(due[0]);
+      now = due[1].at;
+      due[1].fn();
+    }
+    now = until;
   };
   const events = [];
   // keep the real implementation reachable: the spy below replaces the global
   ctx.realTelemetry = ctx.telemetry;
   ctx.telemetry = (event, fields) => events.push([event, fields || {}]);
-  return { ctx, opened, flush, events, elements, listener: () => listener };
+  return { ctx, opened, advance, events, elements, pending: () => timers.size, listener: () => listener };
 }
+
+const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS } = boot().ctx;
 
 {
   const t = boot();
   vm.runInContext("loadSettings(); settings.videoOrder = 'sequential'; buildPlaylist(); playVideo(pickNext());", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   for (let i = 0; i < 3; i++) t.listener().onbufferingcomplete();
   t.listener().onstreamcompleted();
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v1.mov'], 'rebuffering must not skip videos in sequential order');
 }
 
 {
   const t = boot();
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0); playVideo(1); playVideo(2);", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   assert.deepStrictEqual(t.opened, ['http://x/v2.mov'], 'rapid skips must only start the last video');
 }
 
 {
   const t = boot();
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   t.listener().onbufferingcomplete();
   vm.runInContext("settings.category = 'space'; buildPlaylist(); playVideo(takeNext());", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   assert.ok(['http://x/v3.mov', 'http://x/v4.mov'].includes(t.opened[1]), 'category change must drop the prefetched video');
 }
 
@@ -92,9 +109,9 @@ function boot() {
   const stale = [];
   t.ctx.webapis.avplay.prepareAsync = (ok, fail) => stale.push(fail);
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   vm.runInContext("playVideo(1);", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   stale[0]();
   assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v1.mov'], 'a stale prepare failure must not reopen the old video');
 }
@@ -104,8 +121,8 @@ function boot() {
   const fails = [];
   t.ctx.webapis.avplay.prepareAsync = (ok, fail) => fails.push(fail);
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
-  t.flush();
-  for (let i = 0; i < 3; i++) { fails[fails.length - 1](); t.flush(); }
+  t.advance(PRELOAD_FADE_MS);
+  for (let i = 0; i < 3; i++) { fails[fails.length - 1](); t.advance(RETRY_DELAYS_MS[1]); }
   assert.deepStrictEqual(
     t.opened,
     ['http://x/v0.mov', 'http://x/v0.mov', 'http://x/v0.mov', 'https://x/v0.mov'],
@@ -119,9 +136,9 @@ function boot() {
   t.ctx.webapis.avplay.prepareAsync = ok => prepared.push(ok);
   t.ctx.webapis.avplay.play = () => { throw new Error('InvalidStateError'); };
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   prepared[0]();
-  t.flush();
+  t.advance(RETRY_DELAYS_MS[0]);
   assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v0.mov'], 'a play() exception must retry instead of stalling');
 }
 
@@ -142,9 +159,9 @@ function boot() {
 {
   const t = boot();
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
-  t.flush();
-  t.flush();
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
+  t.advance(BUFFER_TIMEOUT_MS);
+  t.advance(RETRY_DELAYS_MS[0]);
   assert.deepStrictEqual(
     t.opened,
     ['http://x/v0.mov', 'http://x/v0.mov'],
@@ -155,10 +172,9 @@ function boot() {
 {
   const t = boot();
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   t.listener().onbufferingcomplete();
-  t.flush();
-  t.flush();
+  t.advance(BUFFER_TIMEOUT_MS * 2);
   assert.deepStrictEqual(t.opened, ['http://x/v0.mov'], 'buffering completion must cancel the watchdog');
 }
 
@@ -173,24 +189,23 @@ function boot() {
 {
   const t = boot();
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   const stale = t.listener();
   stale.onerror('first');
   stale.onerror('duplicate');
-  t.flush();
+  t.advance(RETRY_DELAYS_MS[0]);
   t.listener().onbufferingcomplete();
   stale.onerror('late');
-  t.flush();
-  t.flush();
+  t.advance(BUFFER_TIMEOUT_MS * 2);
   assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v0.mov'], 'duplicate and stale errors must not retry the current stream');
 }
 {
   const t = boot();
   t.ctx.webapis.avplay.prepareAsync = () => {};
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
-  t.flush();
-  t.flush();
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
+  t.advance(BUFFER_TIMEOUT_MS);
+  t.advance(RETRY_DELAYS_MS[0]);
   assert.deepStrictEqual(
     t.opened,
     ['http://x/v0.mov', 'http://x/v0.mov'],
@@ -201,11 +216,11 @@ function boot() {
 {
   const t = boot();
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   t.listener().onbufferingcomplete();
   t.listener().onbufferingstart();
-  t.flush();
-  t.flush();
+  t.advance(BUFFER_TIMEOUT_MS);
+  t.advance(RETRY_DELAYS_MS[0]);
   assert.deepStrictEqual(
     t.opened,
     ['http://x/v0.mov', 'http://x/v0.mov'],
@@ -229,7 +244,7 @@ function boot() {
   const fails = [];
   t.ctx.webapis.avplay.prepareAsync = (ok, fail) => fails.push(fail);
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   fails[0]();
   const failure = t.events.find(([e]) => e === 'playback_failure');
   assert.ok(failure, 'a failed attempt must emit a telemetry event: ' + JSON.stringify(t.events));
@@ -259,10 +274,10 @@ function boot() {
 {
   const t = boot();
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   const before = t.opened.length;
   vm.runInContext("applySetting('category', 'space');", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   assert.strictEqual(t.opened.length, before + 1, 'changing category must restart playback');
   assert.ok(['http://x/v3.mov', 'http://x/v4.mov'].includes(t.opened[before]), 'the restarted video must come from the new category: ' + t.opened[before]);
 }
@@ -298,14 +313,14 @@ function boot() {
   let state = 'PLAYING';
   t.ctx.webapis.avplay.getState = () => state;
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   state = 'PAUSED';
-  t.flush();
-  t.flush();
+  t.advance(BUFFER_TIMEOUT_MS);
+  t.advance(BUFFER_TIMEOUT_MS);
   assert.deepStrictEqual(t.opened, ['http://x/v0.mov'], 'a paused video must not be restarted by the watchdog');
   state = 'PLAYING';
-  t.flush();
-  t.flush();
+  t.advance(BUFFER_TIMEOUT_MS);
+  t.advance(RETRY_DELAYS_MS[0]);
   assert.deepStrictEqual(
     t.opened,
     ['http://x/v0.mov', 'http://x/v0.mov'],
@@ -361,7 +376,7 @@ function boot() {
   const t = boot();
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
   assert.ok(t.elements.loading.classes.has('visible'), 'the loading screen must show while a video prepares');
-  t.flush();
+  t.advance(PRELOAD_FADE_MS);
   t.listener().onbufferingcomplete();
   assert.ok(!t.elements.loading.classes.has('visible'), 'and must clear once the video is buffered');
 }
@@ -403,6 +418,14 @@ function boot() {
   for (const needle of ['STORAGE', 'boot 1', 'preference:', 'wgt-private:', 'localStorage:', 'PLAYBACK', 'EVENTS']) {
     assert.ok(text.indexOf(needle) !== -1, 'the board must report ' + needle + ': ' + text.slice(0, 120));
   }
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  t.advance(PRELOAD_FADE_MS);
+  vm.runInContext("stopPlayback();", t.ctx);
+  assert.strictEqual(t.pending(), 0, 'stopping playback must leave no timer running behind the viewer');
 }
 
 console.log('player tests passed');
