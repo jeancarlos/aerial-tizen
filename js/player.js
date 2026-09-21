@@ -2,6 +2,7 @@ var PRELOAD_FADE_MS = 500;
 var ERROR_SKIP_MS = 2000;
 var RETRY_DELAYS_MS = [1000, 3000];
 var BUFFER_TIMEOUT_MS = 20000;
+var MAX_SKIP_DELAY_MS = 60000;
 
 var playlist = [];
 var playlistIndex = -1;
@@ -11,6 +12,7 @@ var playToken = 0;
 var transitionStartedAt = 0;
 var transitionReported = false;
 var rebufferCount = 0;
+var skipStreak = 0;
 var infoTimer = null;
 
 var avplay = webapis.avplay;
@@ -31,6 +33,9 @@ function buildPlaylist() {
     }
   }
   if (playlist.length === 0) {
+    // Nothing to play is worse than the wrong thing, so fall back to the whole
+    // catalog - but say so, instead of leaving the setting looking ignored.
+    telemetry('category_empty', { category: settings.category });
     for (var j = 0; j < CATALOG.length; j++) playlist.push(j);
   }
   playlistIndex = playlist.indexOf(videoIndex);
@@ -129,20 +134,31 @@ function stopPlayback() {
 
 function getVideoUrls(index) {
   var url = CATALOG[index].url;
-  var fallback = [url, url.replace('http://', 'https://')];
+  var urls = [url, url.replace('http://', 'https://')];
   if (settings.devMode && settings.customServerEnabled) {
-    return [joinUrl(settings.customServerUrl, fileName(url))].concat(fallback);
+    urls.unshift(joinUrl(settings.customServerUrl, fileName(url)));
   }
-  return fallback;
+  // An https catalog entry is its own secure fallback, and a custom server can
+  // be handed the address it is already serving: a repeated URL would only
+  // spend the retry budget twice on the same dead host.
+  return urls.filter(function (u, i) { return urls.indexOf(u) === i; });
 }
 
 function skipAfterError() {
-  telemetry('video_skipped', { video: videoIndex >= 0 && CATALOG[videoIndex] ? CATALOG[videoIndex].label : '' });
+  skipStreak++;
+  telemetry('video_skipped', {
+    video: videoIndex >= 0 && CATALOG[videoIndex] ? CATALOG[videoIndex].label : '',
+    streak: skipStreak
+  });
   stopPlayback();
   var token = playToken;
+  // With the network down nothing is playable, and the catalog is long enough
+  // that a flat delay would reopen dead URLs for hours. Back off to one attempt
+  // a minute; the first video that buffers clears the streak.
+  var delay = Math.min(ERROR_SKIP_MS * Math.pow(2, skipStreak - 1), MAX_SKIP_DELAY_MS);
   setTimeout(function () {
     if (token === playToken) playVideo(takeNext());
-  }, ERROR_SKIP_MS);
+  }, delay);
 }
 
 // ── Playback ──
@@ -241,6 +257,7 @@ function playbackListener(run) {
       if (!runIsLive(run)) return;
       clearWatchdog();
       hideLoading();
+      skipStreak = 0;
       reportBuffered(run);
       hidePreload();
       scheduleHideInfo();

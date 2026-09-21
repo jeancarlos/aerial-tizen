@@ -10,6 +10,28 @@ var DEFAULT_SETTINGS = {
   devMode: !!LOCAL_SERVER
 };
 
+var CATEGORIES = [
+  { value: 'all', label: 'All' },
+  { value: 'space', label: 'Space' },
+  { value: 'sea', label: 'Sea' },
+  { value: 'landscape', label: 'Landscape' },
+  { value: 'cityscape', label: 'Cityscape' }
+];
+
+// Offering a category the catalog cannot fill makes the setting look ignored:
+// buildPlaylist has to fall back to the whole catalog to have anything to play.
+// ponytail: a category that appears in the catalog without an entry above stays
+// unlisted until someone gives it a label.
+function categoryOptions() {
+  return CATEGORIES.filter(function (option) {
+    if (option.value === 'all') return true;
+    for (var i = 0; i < CATALOG.length; i++) {
+      if (CATALOG[i].category === option.value) return true;
+    }
+    return false;
+  });
+}
+
 var MENU_ITEMS = [
   {
     key: 'showDescription',
@@ -42,13 +64,7 @@ var MENU_ITEMS = [
     key: 'category',
     label: 'Category',
     type: 'toggle',
-    options: [
-      { value: 'all', label: 'All' },
-      { value: 'space', label: 'Space' },
-      { value: 'sea', label: 'Sea' },
-      { value: 'landscape', label: 'Landscape' },
-      { value: 'cityscape', label: 'Cityscape' }
-    ]
+    options: categoryOptions()
   },
   {
     key: 'customServerEnabled',
@@ -102,6 +118,12 @@ function clampSettings() {
     if (settings[item.key] < item.min) settings[item.key] = item.min;
     if (settings[item.key] > item.max) settings[item.key] = item.max;
   }
+  var offered = categoryOptions();
+  var known = false;
+  for (var c = 0; c < offered.length; c++) {
+    if (offered[c].value === settings.category) known = true;
+  }
+  if (!known) settings.category = 'all';
 }
 
 function saveSettings() {

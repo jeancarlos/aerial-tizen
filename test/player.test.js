@@ -75,7 +75,7 @@ function boot() {
   return { ctx, opened, advance, events, elements, pending: () => timers.size, listener: () => listener };
 }
 
-const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS } = boot().ctx;
+const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS, ERROR_SKIP_MS, MAX_SKIP_DELAY_MS } = boot().ctx;
 
 {
   const t = boot();
@@ -426,6 +426,70 @@ const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS } = boot().ctx;
   t.advance(PRELOAD_FADE_MS);
   vm.runInContext("stopPlayback();", t.ctx);
   assert.strictEqual(t.pending(), 0, 'stopping playback must leave no timer running behind the viewer');
+}
+
+{
+  const t = boot();
+  t.ctx.CATALOG[0].url = 'https://x/v0.mov';
+  vm.runInContext("loadSettings();", t.ctx);
+  assert.deepStrictEqual(
+    [...vm.runInContext("getVideoUrls(0)", t.ctx)],
+    ['https://x/v0.mov'],
+    'an https catalog URL must not be retried twice as its own fallback'
+  );
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); settings.devMode = true; settings.customServerEnabled = true; settings.customServerUrl = 'http://x';", t.ctx);
+  assert.deepStrictEqual(
+    [...vm.runInContext("getVideoUrls(0)", t.ctx)],
+    ['http://x/v0.mov', 'https://x/v0.mov'],
+    'a custom server pointed at the catalog host must not double the retry budget'
+  );
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); buildPlaylist();", t.ctx);
+  for (let i = 0; i < 6; i++) vm.runInContext("skipAfterError();", t.ctx);
+  t.advance(ERROR_SKIP_MS);
+  t.advance(PRELOAD_FADE_MS);
+  assert.deepStrictEqual(t.opened, [], 'a streak of failures must not keep retrying on the base delay');
+  t.advance(MAX_SKIP_DELAY_MS);
+  t.advance(PRELOAD_FADE_MS);
+  assert.strictEqual(t.opened.length, 1, 'but the backoff must expire and try again');
+
+  t.listener().onbufferingcomplete();
+  vm.runInContext("skipAfterError();", t.ctx);
+  t.advance(ERROR_SKIP_MS);
+  t.advance(PRELOAD_FADE_MS);
+  assert.strictEqual(t.opened.length, 2, 'and a video that plays must clear the streak');
+}
+
+{
+  const t = boot();
+  const values = vm.runInContext(
+    "MENU_ITEMS.filter(function (i) { return i.key === 'category'; })[0].options.map(function (o) { return o.value; })",
+    t.ctx
+  );
+  assert.deepStrictEqual([...values], ['all', 'space', 'sea'], 'only categories the catalog can fill may be offered');
+}
+
+{
+  const t = boot();
+  vm.runInContext("settings = {}; localStorage.setItem('aerial_settings', JSON.stringify({category: 'cityscape'})); loadSettings();", t.ctx);
+  assert.strictEqual(t.ctx.settings.category, 'all', 'a stored category the catalog cannot fill must fall back to all');
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); settings.category = 'cityscape'; buildPlaylist();", t.ctx);
+  assert.ok(
+    t.events.some(([e]) => e === 'category_empty'),
+    'an unfillable category must be reported, not silently ignored: ' + JSON.stringify(t.events)
+  );
+  assert.strictEqual(t.ctx.playlist.length, 5, 'and playback must still have the whole catalog to fall back on');
 }
 
 console.log('player tests passed');
