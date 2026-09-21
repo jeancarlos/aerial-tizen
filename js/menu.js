@@ -1,3 +1,4 @@
+var menuOpen = false;
 var menuIndex = 0;
 var menuBusyKey = null;
 

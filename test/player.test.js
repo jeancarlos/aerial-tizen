@@ -231,10 +231,11 @@ function boot() {
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
   t.flush();
   fails[0]();
-  const failure = t.events.find(([e]) => e === 'avplay_failure' || e === 'watchdog_timeout');
+  const failure = t.events.find(([e]) => e === 'playback_failure');
   assert.ok(failure, 'a failed attempt must emit a telemetry event: ' + JSON.stringify(t.events));
   assert.strictEqual(failure[1].url, 'http://x/v0.mov', 'the event must name the URL that failed');
   assert.ok(failure[1].reason, 'the event must carry a reason');
+  assert.ok(['preparing', 'playing'].indexOf(failure[1].phase) !== -1, 'and must name the phase that failed, not guess from the event name: ' + failure[1].phase);
 }
 
 {
@@ -367,7 +368,7 @@ function boot() {
 
 {
   const t = boot();
-  vm.runInContext("loadSettings(); realTelemetry('one', {}); realTelemetry('two', {}); telemetryToggleLog();", t.ctx);
+  vm.runInContext("loadSettings(); realTelemetry('one', {}); realTelemetry('two', {}); debugToggle();", t.ctx);
   assert.ok(t.elements.logview.classes.has('visible'), 'the log view must toggle on');
   assert.ok(t.elements.logview.textContent.indexOf('two') !== -1, 'and render recent events: ' + t.elements.logview.textContent);
 }

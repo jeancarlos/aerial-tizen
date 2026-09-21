@@ -22,7 +22,6 @@ var DEBUG_BOOT_KEY = 'aerial_boot_count';
 
 var debugRunId = null;
 var debugBootCount = 0;
-var debugStartedAt = Date.now();
 var debugBackends = {};
 
 function debugMakeRunId(bootCount) {
@@ -35,10 +34,10 @@ function debugParseMarker(raw) {
   return parts.length === 2 ? { run: parts[0], at: parts[1] } : null;
 }
 
-function debugClassify(name, priorRaw, wroteOk, readBack) {
+function debugClassify(priorRaw, wroteOk, readBack) {
   var prior = debugParseMarker(priorRaw);
   if (prior && prior.run !== debugRunId) {
-    return { state: 'survived', detail: prior.at, prior: prior };
+    return { state: 'survived', detail: prior.at };
   }
   if (!wroteOk) return { state: 'write-failed', detail: '' };
   if (readBack) return { state: 'readback-ok', detail: 'this run only' };
@@ -60,13 +59,13 @@ function debugProbeSyncBackends() {
   } else {
     var wrotePreference = storagePreferenceSet(DEBUG_PROBE_KEY, marker);
     storagePreferenceSet(DEBUG_BOOT_KEY, debugBootCount);
-    debugBackends.preference = debugClassify('preference', priorPreference, wrotePreference,
+    debugBackends.preference = debugClassify(priorPreference, wrotePreference,
       storagePreferenceGet(DEBUG_PROBE_KEY) === marker);
   }
 
   var wroteLocal = storageLocalSet(DEBUG_PROBE_KEY, marker);
   storageLocalSet(DEBUG_BOOT_KEY, debugBootCount);
-  debugBackends.localStorage = debugClassify('localStorage', priorLocal, wroteLocal,
+  debugBackends.localStorage = debugClassify(priorLocal, wroteLocal,
     storageLocalGet(DEBUG_PROBE_KEY) === marker);
 
   debugBackends['wgt-private'] = storageHasFilesystem()
@@ -88,7 +87,7 @@ function debugProbeFileBackend() {
   var marker = debugRunId + '|' + new Date().toISOString();
   var wrote = storageFileSet(DEBUG_PROBE_KEY, marker);
   storageFileSet(DEBUG_BOOT_KEY, debugBootCount);
-  debugBackends['wgt-private'] = debugClassify('wgt-private', prior, wrote, true);
+  debugBackends['wgt-private'] = debugClassify(prior, wrote, true);
 
   telemetry('storage_probe_file', {
     boot: debugBootCount,
@@ -125,7 +124,7 @@ function debugLines() {
     ', order ' + settings.videoOrder + ', category ' + settings.category);
   lines.push('  playing: ' + (videoIndex >= 0 && CATALOG[videoIndex] ? CATALOG[videoIndex].label : 'none'));
   lines.push('  source: ' + (settings.customServerEnabled ? settings.customServerUrl : 'apple cdn'));
-  lines.push('  uptime ' + Math.round((Date.now() - debugStartedAt) / 1000) + 's');
+  lines.push('  uptime ' + Math.round((Date.now() - telemetryStarted) / 1000) + 's');
 
   lines.push('EVENTS');
   var events = telemetryRecent(8);

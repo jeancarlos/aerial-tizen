@@ -20,10 +20,9 @@ function handleDevSequence(keyCode) {
   if (devSequence !== DEV_TARGET_SEQUENCE) return;
 
   devSequence = '';
-  settings.devMode = !settings.devMode;
-  if (!settings.devMode) settings.customServerEnabled = false;
-  saveSettings();
-  if (menuOpen) renderMenu();
+  var enabled = !settings.devMode;
+  if (!enabled) applySetting('customServerEnabled', false);
+  applySetting('devMode', enabled);
 }
 
 function handleMenuKey(keyCode) {
@@ -92,7 +91,7 @@ if (!CATALOG.length) {
 buildPlaylist();
 
 var savedIndex = parseInt(storageGet('aerial_index'), 10);
-playlistIndex = playlist.indexOf(savedIndex);
+
 storageInitFile(function (saved) {
   debugProbeFileBackend();
   if (!saved) {
@@ -124,5 +123,5 @@ telemetry('app_start', {
   custom_server: settings.customServerEnabled ? settings.customServerUrl : ''
 });
 
-var startupIndex = playlistIndex >= 0 ? savedIndex : pickNext();
+var startupIndex = playlist.indexOf(savedIndex) >= 0 ? savedIndex : pickNext();
 playVideo(startupIndex);

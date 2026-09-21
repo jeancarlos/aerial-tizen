@@ -12,19 +12,6 @@ function telemetryRecent(count) {
   return telemetryLog.slice(-count);
 }
 
-function telemetryRender() {
-  var view = document.getElementById('logview');
-  if (!view || !view.classList.contains('visible')) return;
-  view.textContent = telemetryLog.join('\n');
-}
-
-function telemetryToggleLog() {
-  var view = document.getElementById('logview');
-  if (!view) return;
-  view.classList.toggle('visible');
-  telemetryRender();
-}
-
 function telemetryEnabled() {
   return !!(telemetryConfig && telemetryConfig.clientToken);
 }
@@ -62,12 +49,12 @@ function telemetryFlush() {
   telemetrySend(batch);
 }
 
-function telemetryProbe() {
+function telemetryProbe(query) {
   var base = (typeof AERIAL_PROBE_URL !== 'undefined') ? AERIAL_PROBE_URL : '';
   if (!base) return;
   // An <img> request needs no CORS grant and no XHR, so this reaches a plain
   // file server and lands in its access log even when it 404s.
-  var url = base + '/aerial-probe.gif?t=' + Date.now();
+  var url = base + '/aerial-probe.gif?' + (query || 't=' + Date.now());
   try {
     new Image().src = url;
   } catch (e) {}
@@ -94,9 +81,8 @@ function telemetry(event, fields) {
   telemetryLog.push(line);
   if (telemetryLog.length > TELEMETRY_LOG_MAX) telemetryLog.shift();
   if (typeof debugRender === 'function') debugRender();
-  else telemetryRender();
 
-  if (event === 'avplay_failure' || event === 'watchdog_timeout') {
+  if (event === 'playback_failure') {
     payload.status = 'error';
     console.warn('[telemetry]', event, JSON.stringify(fields || {}));
   }

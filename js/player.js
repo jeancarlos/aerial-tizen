@@ -11,7 +11,6 @@ var playToken = 0;
 var transitionStartedAt = 0;
 var transitionReported = false;
 var rebufferCount = 0;
-var menuOpen = false;
 var infoTimer = null;
 
 var avplay = webapis.avplay;
@@ -203,7 +202,8 @@ function startVideo(index, token) {
       if (!active()) return;
       settled = true;
       clearWatchdog();
-      telemetry(prepared ? 'avplay_failure' : 'watchdog_timeout', {
+      telemetry('playback_failure', {
+        phase: prepared ? 'playing' : 'preparing',
         url: urls[urlIndex],
         url_index: urlIndex,
         attempt: currentAttempt,

@@ -22,7 +22,6 @@ var storageReady = false;
 var storagePending = {};
 var storageWriting = false;
 var storageDirty = false;
-var storageBackendName = 'localStorage';
 var storageErrors = [];
 
 function storageHasPreference() {
@@ -43,8 +42,12 @@ function storageHasFilesystem() {
   }
 }
 
+// Derived, never stored: a name set as a side effect of the last read or
+// write reports whoever answered most recently, not where settings live.
 function storageBackend() {
-  return storageBackendName;
+  if (storageHasPreference()) return 'preference';
+  if (storageHasFilesystem() && storageReady) return 'wgt-private';
+  return 'localStorage';
 }
 
 function storageNoteError(backend, message) {
@@ -175,7 +178,6 @@ function storageInitFile(onReady) {
     }
     storagePending = {};
     storageReady = true;
-    if (storageBackendName === 'localStorage') storageBackendName = 'wgt-private';
     storageFlushFile();
     if (onReady) onReady(parsed);
   }
@@ -209,7 +211,6 @@ function storageInitFile(onReady) {
 function storageGet(key) {
   var fromPreference = storagePreferenceGet(key);
   if (fromPreference !== null) {
-    storageBackendName = 'preference';
     return fromPreference;
   }
   if (storageReady && storageFsCache.hasOwnProperty(key)) return storageFsCache[key];
@@ -222,14 +223,11 @@ function storageSet(key, value) {
   var stored = false;
 
   if (storagePreferenceSet(key, text)) {
-    storageBackendName = 'preference';
     stored = true;
   }
   if (storageFileSet(key, text)) {
-    if (!stored) storageBackendName = 'wgt-private';
     stored = true;
   }
   if (storageLocalSet(key, text)) stored = true;
-
   return stored;
 }
