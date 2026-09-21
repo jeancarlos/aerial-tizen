@@ -5,6 +5,25 @@ var telemetryConfig = (typeof AERIAL_TELEMETRY !== 'undefined') ? AERIAL_TELEMET
 var telemetryQueue = [];
 var telemetryTimer = null;
 var telemetryStarted = Date.now();
+var telemetryLog = [];
+var TELEMETRY_LOG_MAX = 14;
+
+function telemetryRecent(count) {
+  return telemetryLog.slice(-count);
+}
+
+function telemetryRender() {
+  var view = document.getElementById('logview');
+  if (!view || !view.classList.contains('visible')) return;
+  view.textContent = telemetryLog.join('\n');
+}
+
+function telemetryToggleLog() {
+  var view = document.getElementById('logview');
+  if (!view) return;
+  view.classList.toggle('visible');
+  telemetryRender();
+}
 
 function telemetryEnabled() {
   return !!(telemetryConfig && telemetryConfig.clientToken);
@@ -67,6 +86,15 @@ function telemetry(event, fields) {
   for (var key in fields) {
     if (fields.hasOwnProperty(key)) payload[key] = fields[key];
   }
+
+  var line = Math.round((Date.now() - telemetryStarted) / 1000) + 's ' + event;
+  for (var f in fields) {
+    if (fields.hasOwnProperty(f)) line += ' ' + f + '=' + String(fields[f]).slice(-42);
+  }
+  telemetryLog.push(line);
+  if (telemetryLog.length > TELEMETRY_LOG_MAX) telemetryLog.shift();
+  if (typeof debugRender === 'function') debugRender();
+  else telemetryRender();
 
   if (event === 'avplay_failure' || event === 'watchdog_timeout') {
     payload.status = 'error';

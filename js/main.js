@@ -39,6 +39,9 @@ function handleMenuKey(keyCode) {
 
 function handlePlayerKey(keyCode) {
   switch (keyCode) {
+    case 48: // 0 shows the event log, which is the only view into the TV
+      if (settings.devMode) debugToggle();
+      break;
     case 13: // Enter
       openMenu();
       break;
@@ -90,6 +93,28 @@ buildPlaylist();
 
 var savedIndex = parseInt(storageGet('aerial_index'), 10);
 playlistIndex = playlist.indexOf(savedIndex);
+storageInitFile(function (saved) {
+  debugProbeFileBackend();
+  if (!saved) {
+    telemetry('storage_restore_skipped', { reason: 'no file' });
+    return;
+  }
+  if (settingsTouched || videoIndex !== startupIndex) {
+    telemetry('storage_restore_skipped', { reason: 'viewer already navigated' });
+    return;
+  }
+  loadSettings();
+  buildPlaylist();
+  var restored = parseInt(storageGet('aerial_index'), 10);
+  if (restored >= 0 && restored < CATALOG.length && restored !== videoIndex) {
+    telemetry('storage_restored', { backend: storageBackend(), index: restored });
+    playVideo(restored);
+  } else {
+    telemetry('storage_restored', { backend: storageBackend(), index: videoIndex });
+  }
+});
+
+debugProbeSyncBackends();
 telemetryProbe();
 
 telemetry('app_start', {
@@ -99,4 +124,5 @@ telemetry('app_start', {
   custom_server: settings.customServerEnabled ? settings.customServerUrl : ''
 });
 
-playVideo(playlistIndex >= 0 ? savedIndex : pickNext());
+var startupIndex = playlistIndex >= 0 ? savedIndex : pickNext();
+playVideo(startupIndex);

@@ -61,6 +61,12 @@ var MENU_ITEMS = [
     devOnly: true
   },
   {
+    key: 'storageBackend',
+    label: 'Settings stored in',
+    type: 'info',
+    devOnly: true
+  },
+  {
     key: 'customServerUrl',
     label: 'Files location',
     type: 'text',
@@ -69,18 +75,7 @@ var MENU_ITEMS = [
 ];
 
 var settings = {};
-
-function storageGet(key) {
-  try {
-    if (tizen.preference.exists(key)) return tizen.preference.getValue(key);
-  } catch (e) {}
-  try { return localStorage.getItem(key); } catch (e) { return null; }
-}
-
-function storageSet(key, value) {
-  try { tizen.preference.setValue(key, String(value)); } catch (e) {}
-  try { localStorage.setItem(key, value); } catch (e) {}
-}
+var settingsTouched = false;
 
 function loadSettings() {
   var parsed = {};

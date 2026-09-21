@@ -9,6 +9,11 @@
 <body>
   <img id="preload" src="" alt="">
   <div id="fade"></div>
+  <div id="loading">
+    <div id="loading-spinner"></div>
+    <div id="loading-text">Loading</div>
+  </div>
+  <div id="logview"></div>
   <div id="info">
     <div id="info-label"></div>
     <div id="info-description"></div>
@@ -21,11 +26,13 @@
   <object id="player" type="application/avplayer" style="width:1920px;height:1080px;"></object>
   <script src="$WEBAPIS/webapis/webapis.js"></script>
   <script src="js/local-config.js"></script>
+  <script src="js/storage.js"></script>
   <script src="js/telemetry.js"></script>
   <script src="js/catalog.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/player.js"></script>
   <script src="js/menu.js"></script>
+  <script src="js/debug.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

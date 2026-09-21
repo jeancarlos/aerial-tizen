@@ -8,7 +8,23 @@ function boot() {
   let nextTimerId = 1;
   const opened = [];
   let listener = null;
-  const el = () => ({ classList: { add() {}, remove() {} }, appendChild() {}, set textContent(v) {} });
+  const elements = {};
+  const makeEl = () => {
+    const classes = new Set();
+    return {
+      classes,
+      classList: {
+        add: c => classes.add(c),
+        remove: c => classes.delete(c),
+        contains: c => classes.has(c),
+        toggle: c => (classes.has(c) ? classes.delete(c) : classes.add(c)),
+      },
+      appendChild() {},
+      set textContent(v) { this._text = v; },
+      get textContent() { return this._text; },
+    };
+  };
+  const el = id => (elements[id] = elements[id] || makeEl());
   const ctx = {
     console,
     CATALOG: [0, 1, 2, 3, 4].map(i => ({ url: 'http://x/v' + i + '.mov', label: 'L' + i, description: '', category: i < 3 ? 'sea' : 'space' })),
@@ -16,7 +32,7 @@ function boot() {
       const store = new Map();
       return { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) };
     })(),
-    document: { getElementById: el, addEventListener() {}, createElement: el, createTextNode() {} },
+    document: { getElementById: el, addEventListener() {}, createElement: makeEl, createTextNode: () => ({}) },
     Image: function () {},
     setTimeout: fn => { const id = nextTimerId++; timers.set(id, fn); return id; },
     clearTimeout: id => timers.delete(id),
@@ -31,15 +47,17 @@ function boot() {
     }
   };
   vm.createContext(ctx);
-  for (const f of ['telemetry', 'settings', 'player', 'menu']) {
+  for (const f of ['storage', 'telemetry', 'settings', 'player', 'menu', 'debug']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../js', f + '.js'), 'utf8'), ctx);
   }
   const flush = () => {
     for (const [id, fn] of [...timers]) { timers.delete(id); fn(); }
   };
   const events = [];
+  // keep the real implementation reachable: the spy below replaces the global
+  ctx.realTelemetry = ctx.telemetry;
   ctx.telemetry = (event, fields) => events.push([event, fields || {}]);
-  return { ctx, opened, flush, events, listener: () => listener };
+  return { ctx, opened, flush, events, elements, listener: () => listener };
 }
 
 {
@@ -292,6 +310,98 @@ function boot() {
     ['http://x/v0.mov', 'http://x/v0.mov'],
     'but a real stall after resuming must still be caught'
   );
+}
+
+{
+  const t = boot();
+  const prefs = {};
+  t.ctx.tizen.preference = {
+    exists: k => k in prefs,
+    getValue: k => prefs[k],
+    setValue: (k, v) => { prefs[k] = v; }
+  };
+  vm.runInContext("storageSet('aerial_index', 7);", t.ctx);
+  assert.strictEqual(prefs.aerial_index, '7', 'preference must be written when the API exists');
+  assert.strictEqual(t.ctx.storageBackend(), 'preference', 'and must be reported as the backend');
+}
+
+{
+  const t = boot();
+  const written = {};
+  let readBack = null;
+  t.ctx.tizen.filesystem = {
+    resolve: (name, ok) => ok({
+      resolve: () => ({
+        readAsText: (cb) => cb(JSON.stringify({ aerial_index: '4' })),
+        openStream: (mode, cb) => cb({ write: (text) => { written.text = text; }, close() {} })
+      }),
+      createFile: () => ({
+        openStream: (mode, cb) => cb({ write: (text) => { written.text = text; }, close() {} })
+      })
+    })
+  };
+  let restored = null;
+  vm.runInContext("storageInitFile(function (saved) { globalThis.__saved = saved; });", t.ctx);
+  assert.strictEqual(t.ctx.__saved && t.ctx.__saved.aerial_index, '4', 'the durable file must be read at start-up');
+  assert.strictEqual(t.ctx.storageGet('aerial_index'), '4', 'and its values must be readable');
+  vm.runInContext("storageSet('aerial_index', 9);", t.ctx);
+  assert.ok(written.text && written.text.indexOf('"9"') !== -1, 'writes must reach the file: ' + written.text);
+  assert.strictEqual(t.ctx.storageBackend(), 'wgt-private', 'the file must be reported as the backend');
+}
+
+{
+  const t = boot();
+  vm.runInContext("storageSet('aerial_index', 2);", t.ctx);
+  assert.strictEqual(t.ctx.storageBackend(), 'localStorage', 'with neither API present the fallback is reported honestly');
+  assert.strictEqual(t.ctx.storageGet('aerial_index'), '2', 'and it still round-trips');
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  assert.ok(t.elements.loading.classes.has('visible'), 'the loading screen must show while a video prepares');
+  t.flush();
+  t.listener().onbufferingcomplete();
+  assert.ok(!t.elements.loading.classes.has('visible'), 'and must clear once the video is buffered');
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); realTelemetry('one', {}); realTelemetry('two', {}); telemetryToggleLog();", t.ctx);
+  assert.ok(t.elements.logview.classes.has('visible'), 'the log view must toggle on');
+  assert.ok(t.elements.logview.textContent.indexOf('two') !== -1, 'and render recent events: ' + t.elements.logview.textContent);
+}
+
+{
+  const t = boot();
+  const prefs = {};
+  t.ctx.tizen.preference = {
+    exists: k => k in prefs,
+    getValue: k => prefs[k],
+    setValue: (k, v) => { prefs[k] = v; }
+  };
+  vm.runInContext("loadSettings(); buildPlaylist(); debugProbeSyncBackends();", t.ctx);
+  assert.strictEqual(t.ctx.debugBootCount, 1, 'a first run counts as boot 1');
+  assert.strictEqual(t.ctx.debugBackends.preference.state, 'readback-ok', 'a first run has no earlier marker');
+
+  const second = boot();
+  second.ctx.tizen.preference = {
+    exists: k => k in prefs,
+    getValue: k => prefs[k],
+    setValue: (k, v) => { prefs[k] = v; }
+  };
+  vm.runInContext("loadSettings(); buildPlaylist(); debugProbeSyncBackends();", second.ctx);
+  assert.strictEqual(second.ctx.debugBootCount, 2, 'a later run reads the earlier count back');
+  assert.strictEqual(second.ctx.debugBackends.preference.state, 'survived', 'a later run must see the earlier marker as survived');
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); buildPlaylist(); debugProbeSyncBackends(); debugToggle();", t.ctx);
+  const text = t.elements.logview.textContent;
+  for (const needle of ['STORAGE', 'boot 1', 'preference:', 'wgt-private:', 'localStorage:', 'PLAYBACK', 'EVENTS']) {
+    assert.ok(text.indexOf(needle) !== -1, 'the board must report ' + needle + ': ' + text.slice(0, 120));
+  }
 }
 
 console.log('player tests passed');

@@ -20,6 +20,8 @@ function createMenuItemEl(item, isActive) {
     }
   } else if (item.type === 'number') {
     display = value + item.suffix;
+  } else if (item.type === 'info') {
+    display = storageBackend();
   }
 
   var busy = menuBusyKey === item.key;
@@ -37,11 +39,11 @@ function createMenuItemEl(item, isActive) {
 
   var arrowL = document.createElement('span');
   arrowL.className = 'menu-arrow';
-  arrowL.textContent = (item.type === 'text' || busy) ? '' : '◀ ';
+  arrowL.textContent = (item.type === 'text' || item.type === 'info' || busy) ? '' : '◀ ';
 
   var arrowR = document.createElement('span');
   arrowR.className = 'menu-arrow';
-  arrowR.textContent = (item.type === 'text' || busy) ? '' : ' ▶';
+  arrowR.textContent = (item.type === 'text' || item.type === 'info' || busy) ? '' : ' ▶';
 
   val.appendChild(arrowL);
   val.appendChild(document.createTextNode(display));
@@ -100,6 +102,7 @@ function testConnection(baseUrl, callback) {
 }
 
 function applySetting(key, value) {
+  settingsTouched = true;
   settings[key] = value;
   saveSettings();
 
@@ -123,6 +126,7 @@ function applySetting(key, value) {
 function menuChangeValue(direction) {
   if (menuBusyKey) return;
   var item = getVisibleMenuItems()[menuIndex];
+  if (item.type === 'info') return;
   var current = settings[item.key];
 
   if (item.type === 'toggle') {

@@ -24,7 +24,7 @@ echo "==> Staging runtime files..."
 mkdir -p "$STAGE/css" "$STAGE/js"
 cp "$DIR/config.xml" "$DIR/icon.png" "$DIR/index.html" "$STAGE/"
 cp "$DIR/css/style.css" "$STAGE/css/"
-for name in catalog telemetry settings player menu main; do
+for name in catalog storage telemetry settings player menu debug main; do
   cp "$DIR/js/$name.js" "$STAGE/js/"
 done
 if [ -f "$DIR/js/local-config.js" ]; then

@@ -8,6 +8,9 @@ var playlistIndex = -1;
 var videoIndex = -1;
 var nextIndex = -1;
 var playToken = 0;
+var transitionStartedAt = 0;
+var transitionReported = false;
+var rebufferCount = 0;
 var menuOpen = false;
 var infoTimer = null;
 
@@ -17,6 +20,7 @@ var fade = document.getElementById('fade');
 var info = document.getElementById('info');
 var infoLabel = document.getElementById('info-label');
 var infoDescription = document.getElementById('info-description');
+var loadingEl = document.getElementById('loading');
 
 // ── Playlist ──
 
@@ -71,6 +75,14 @@ function prefetchNextThumbnail() {
   if (nextIndex >= 0) return;
   nextIndex = pickNext();
   new Image().src = getPreloadPath(CATALOG[nextIndex].url);
+}
+
+function showLoading() {
+  if (loadingEl) loadingEl.classList.add('visible');
+}
+
+function hideLoading() {
+  if (loadingEl) loadingEl.classList.remove('visible');
 }
 
 function hidePreload() {
@@ -209,16 +221,29 @@ function startVideo(index, token) {
       try { avplay.setStreamingProperty('SET_MODE_4K', 'TRUE'); } catch (e) {}
       avplay.setListener({
         onbufferingstart: function () {
-          if (active()) armWatchdog();
+          if (!active()) return;
+          rebufferCount++;
+          telemetry('rebuffer_start', { video: CATALOG[index] ? CATALOG[index].label : '', count: rebufferCount });
+          armWatchdog();
         },
         onbufferingcomplete: function () {
           if (!active()) return;
           clearWatchdog();
-          telemetry('buffering_complete', {
-            url: urls[urlIndex],
-            video: CATALOG[index] ? CATALOG[index].label : '',
-            startup_ms: Date.now() - attemptStarted
-          });
+          hideLoading();
+          if (!transitionReported) {
+            transitionReported = true;
+            telemetry('transition_ms', {
+              url: urls[urlIndex],
+              video: CATALOG[index] ? CATALOG[index].label : '',
+              ms: Date.now() - transitionStartedAt
+            });
+          } else {
+            telemetry('rebuffer_end', {
+              video: CATALOG[index] ? CATALOG[index].label : '',
+              count: rebufferCount,
+              ms: Date.now() - attemptStarted
+            });
+          }
           hidePreload();
           scheduleHideInfo();
           prefetchNextThumbnail();
@@ -252,6 +277,15 @@ function startVideo(index, token) {
 
 function playVideo(index) {
   stopPlayback();
+  showLoading();
+  transitionStartedAt = Date.now();
+  transitionReported = false;
+  rebufferCount = 0;
+  // Keep the playlist cursor on whatever is actually playing: without this a
+  // video started outside pickNext (a resume, a category change) leaves
+  // sequential order picking the current video again as its "next".
+  var position = playlist.indexOf(index);
+  if (position >= 0) playlistIndex = position;
   var token = playToken;
   hideInfo();
   videoIndex = index;
