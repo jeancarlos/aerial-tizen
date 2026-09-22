@@ -492,4 +492,16 @@ const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS, ERROR_SKIP_MS, MAX_
   assert.strictEqual(t.ctx.playlist.length, 5, 'and playback must still have the whole catalog to fall back on');
 }
 
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  assert.ok(t.elements.loading.classes.has('visible'), 'the first video must show the spinner');
+  t.advance(PRELOAD_FADE_MS);
+  t.listener().onbufferingcomplete();
+  vm.runInContext("playVideo(1);", t.ctx);
+  assert.ok(!t.elements.loading.classes.has('visible'), 'a later transition must not flash the spinner again');
+  vm.runInContext("skipAfterError(); playVideo(2);", t.ctx);
+  assert.ok(t.elements.loading.classes.has('visible'), 'but a stream that keeps failing must bring it back');
+}
+
 console.log('player tests passed');

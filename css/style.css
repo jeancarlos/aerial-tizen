@@ -75,26 +75,29 @@ html, body {
   width: 64px;
   height: 64px;
   margin: -32px 0 0 -32px;
-  border: 4px solid rgba(255, 255, 255, 0.25);
-  border-top-color: rgba(255, 255, 255, 0.9);
-  border-radius: 50%;
-  animation: aerial-spin 1s linear infinite;
 }
 
-@keyframes aerial-spin {
-  to { transform: rotate(360deg); }
-}
-
-#loading-text {
+/* The twelve-bar activity indicator: each bar sits one twelfth of a turn
+   further round and starts its fade one twelfth of a cycle later, so the
+   highlight walks the ring instead of a hard edge sweeping it. */
+#loading-spinner i {
   position: absolute;
-  top: 50%;
-  left: 0;
-  width: 100%;
-  margin-top: 48px;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 22px;
-  letter-spacing: 2px;
+  top: 0;
+  left: 50%;
+  width: 5px;
+  height: 16px;
+  margin-left: -2.5px;
+  border-radius: 2.5px;
+  background: #fff;
+  transform-origin: 2.5px 32px;
+  transform: rotate(calc(var(--n) * 30deg));
+  animation: aerial-bar-fade 1.2s linear infinite;
+  animation-delay: calc(var(--n) * 0.1s - 1.2s);
+}
+
+@keyframes aerial-bar-fade {
+  0% { opacity: 1; }
+  100% { opacity: 0.15; }
 }
 
 /* ── On-screen log ── */

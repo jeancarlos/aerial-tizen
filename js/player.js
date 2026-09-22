@@ -13,6 +13,7 @@ var transitionStartedAt = 0;
 var transitionReported = false;
 var rebufferCount = 0;
 var skipStreak = 0;
+var firstVideoPlayed = false;
 var infoTimer = null;
 
 var avplay = webapis.avplay;
@@ -82,10 +83,15 @@ function prefetchNextThumbnail() {
 }
 
 function showLoading() {
-  if (loadingEl) loadingEl.classList.add('visible');
+  // Once a video has played the preload thumbnail covers every transition, so
+  // a spinner on each one is noise over a screensaver. It comes back only when
+  // nothing is playing and the viewer would otherwise stare at a frozen frame.
+  if (!loadingEl || (firstVideoPlayed && skipStreak === 0)) return;
+  loadingEl.classList.add('visible');
 }
 
 function hideLoading() {
+  firstVideoPlayed = true;
   if (loadingEl) loadingEl.classList.remove('visible');
 }
 
