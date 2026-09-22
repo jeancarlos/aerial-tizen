@@ -234,7 +234,7 @@ bash test/run-all.sh
 | Suite | Coverage |
 |---|---|
 | `test/player.test.js` | Stale-work cancellation. Retries, watchdog. Category restarts. Settings clamping, persistence. |
-| `test/catalog-sync.test.sh` | Missing thumbnails and stray .jpg files; URL uniqueness and HTTP scheme; H264 map consistency including orphan keys. |
+| `test/catalog-sync.test.sh` | Missing thumbnails, thumbnails no catalog entry claims, and stray .jpg files; URL uniqueness and HTTP scheme; H264 map consistency including orphan keys. |
 
 The player suite runs the application in a `vm` context, stubs the Samsung APIs, and virtualizes the clock. The tests declare the expected delay directly, avoiding manual timer counts.
 

@@ -103,6 +103,18 @@ else
   printf "$missing_thumbs" | sed 's/^/    /'
 fi
 
+want_thumbs=$(while read -r url; do basename "$url" .mov | sed 's/$/.webp/'; done <<< "$catalog_urls" | sort)
+have_thumbs=$(find "$ROOT/preload" -name '*.webp' -printf '%f\n' | sort)
+orphan_thumbs=$(comm -13 <(echo "$want_thumbs") <(echo "$have_thumbs"))
+msg="No preload thumbnails without a catalog entry"
+if [ -z "$orphan_thumbs" ]; then
+  ok "$msg"
+else
+  n=$(echo "$orphan_thumbs" | wc -l)
+  fail "$msg — $n orphan:"
+  echo "$orphan_thumbs" | sed 's/^/    /'
+fi
+
 msg="No leftover .jpg thumbnails"
 check [ "$(find "$ROOT/preload" -name '*.jpg' | wc -l)" -eq 0 ]
 
