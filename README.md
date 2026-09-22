@@ -1,86 +1,60 @@
-# Aerial Screensaver for Samsung Tizen TV
+# Aerial for Samsung Tizen TV
 
-<p align="center">
-  <img src="icon.png" width="256" alt="Aerial Screensaver Icon">
-</p>
+This application brings Apple TV aerial screensavers to Samsung TVs. It ships a catalog of 115 videos and decodes them in hardware as HEVC 4K through AVPlay.
 
----
+[Live demo](https://jeancarlos.github.io/aerial-tizen/)
 
-Apple TV aerial screensaver videos playing natively on Samsung Smart TVs. Uses Samsung's AVPlay API for hardware-decoded HEVC 4K playback with smooth fade transitions between videos.
+![Aerial running in the browser demo](docs/screenshot.png)
 
-115 verified 4K aerial videos from Apple's CDN across four categories: Space (ISS orbital views), Sea (underwater wildlife), Landscape (national parks and glaciers), and Cityscape (world cities at golden hour). Each video shows a title and description overlay while it loads.
+The demo runs the application against a mocked AVPlay environment and displays catalog placeholder frames. Apple aerials use HTTP, and `sylvan.apple.com` uses a private Apple CA, meaning HTTPS pages block both. To work around this, the local HTTP simulator plays H.264 1080p video.
 
-## Thanks
+## Playback
 
-Inspired by [xscreensaver-aerial](https://github.com/graysky2/xscreensaver-aerial) by graysky2.
+The player streams 115 verified videos from the Apple CDN, accompanied by 115 thumbnails with one mapped to each video.
 
----
+| Category | Videos |
+|---|---:|
+| Space | 22 |
+| Sea | 21 |
+| Landscape | 42 |
+| Cityscape | 30 |
+
+The player uses fade transitions and displays title and description overlays during load. A twelve-bar activity indicator appears on a cold start, while preload thumbnails cover subsequent transitions. The indicator returns when consecutive failures leave nothing playing.
+
+The application consists of about 1,950 lines of ES5 across the eight scripts that ship, and it requires no dependencies, frameworks, or build steps.
 
 ## Requirements
 
-- Samsung Smart TV with **Tizen 6.0+** (2021 models or newer)
-- Linux, macOS, or Windows PC on the **same network segment** as the TV
-- [Tizen Studio CLI](https://developer.tizen.org/development/tizen-studio/download), or Docker if you prefer the containerised route below
-- Node.js, only to run the test suite
+- Samsung Smart TV, Tizen 6.0+ (2021+).
+- Linux, macOS, or Windows PC on same network segment.
+- [Tizen Studio CLI](https://developer.tizen.org/development/tizen-studio/download) or Docker.
+- Node.js (tests only).
 
-A Samsung developer account is **not** required. The TV accepts a package signed with the Tizen public distributor certificate that ships with Tizen Studio, which is what the instructions below use. A Samsung distributor certificate is needed only for store submission or for partner-level privileges, neither of which this app uses.
-
----
-
-## How it works
-
-The app is plain HTML, CSS and JavaScript with no build step and no dependencies. Scripts load in a fixed order and share state through globals:
-
-| File | Responsibility |
-|---|---|
-| `js/local-config.js` | Optional, untracked. Deployment-specific values: LAN media server, telemetry credentials. |
-| `js/telemetry.js` | Optional event reporting. Silent and network-free unless configured. |
-| `js/catalog.js` | Generated. `var CATALOG = [{url, label, description, category}]`. |
-| `js/settings.js` | Defaults, the menu model, persistence, range clamping. |
-| `js/player.js` | Playlist, thumbnail preload, info overlay, AVPlay lifecycle, retry ladder, stall watchdog. |
-| `js/menu.js` | The settings menu and the LAN server connection test. |
-| `js/main.js` | Remote key handling, app lifecycle, start-up. |
-
-`js/catalog.js`, `js/h264map.js` and `preload/*.webp` are **generated artifacts**, produced by a separate tool that verifies every link against Apple's CDN before listing it and extracts each thumbnail from a frame of its own video. Edit them by hand only for a quick experiment; a regeneration will overwrite them.
-
-### Playback and failure handling
-
-Apple's CDN drops connections under load — measured: 22 of 114 URLs failed on a first parallel probe and every one served video on a retry. The player therefore treats a single failure as noise, not as a dead video:
-
-1. Each URL is tried, then retried twice with 1s and 3s waits.
-2. Then the next URL in the list is tried. The list is the catalog URL and its https form, preceded by the LAN URL when a custom server is enabled.
-3. When every URL fails, the app waits 2s and moves to another video.
-4. A 20s watchdog covers three distinct hangs: a prepare that never calls back, an initial buffer that never completes, and a stall in the middle of a video. Each one enters the ladder above instead of freezing the screen.
-
-Every failure is logged with its URL and reason, so a full pass over the catalog produces the list of videos a given TV cannot play.
-
-### Storage
-
-Settings and the playback position are written through `tizen.preference`, with `localStorage` as a fallback for the desktop simulator. `localStorage` alone is not reliable on a TV: Chromium commits it lazily, so values written just before the app exits are lost.
-
----
+A Samsung developer account is unnecessary because these instructions use the Tizen public distributor certificate. Although store submission requires a Samsung distributor certificate, the app itself needs neither.
 
 ## Install
 
-### 1. Enable Developer Mode on the TV
+### 1. Enable Developer Mode
 
-1. Open **Apps**.
+1. Open Apps on the TV.
 2. Type `12345` on the remote.
-3. Turn **Developer mode** on.
-4. Enter the **IP address of the PC** you will deploy from.
+3. Turn Developer mode on.
+4. Enter the IP address of your PC.
 5. Restart the TV.
 
-### 2. Find the TV's address
+### 2. Find TV IP
 
-Check your router's DHCP leases for the TV's hostname, or scan for the sdb port:
+You can find the TV IP by checking your router DHCP leases or scanning the sdb port:
 
 ```bash
 nmap -p 26101 --open 192.168.0.0/24
 ```
 
-Do not assume an address from an earlier session: a DHCP renewal moves the TV, and every step below will fail against a stale address with timeouts that look like the TV is off.
+Always verify the current address because DHCP renewal changes the IP, and a stale address causes timeouts.
 
-### 3. Deploy with Docker (no local SDK install)
+### 3. Deploy with Docker
+
+This method bypasses local SDK installation.
 
 ```bash
 docker run --rm --network=host -v "$PWD:/app:ro" vitalets/tizen-webos-sdk bash -lc '
@@ -91,7 +65,8 @@ docker run --rm --network=host -v "$PWD:/app:ro" vitalets/tizen-webos-sdk bash -
   STAGE=/tmp/stage; mkdir -p $STAGE/js $STAGE/css
   cp /app/config.xml /app/icon.png /app/index.html $STAGE/
   cp /app/css/style.css $STAGE/css/
-  for n in catalog settings player menu main; do cp /app/js/$n.js $STAGE/js/; done
+  for n in catalog storage telemetry settings player menu debug main; do cp /app/js/$n.js $STAGE/js/; done
+  [ -f /app/js/local-config.js ] && cp /app/js/local-config.js $STAGE/js/
   cp -r /app/preload $STAGE/preload
 
   tizen package -t wgt -s dev -- $STAGE
@@ -101,118 +76,216 @@ docker run --rm --network=host -v "$PWD:/app:ro" vitalets/tizen-webos-sdk bash -
 '
 ```
 
-The image ships a working `dev` signing profile, so no certificate setup is needed. Do not run `tizen cli-config profiles.path=...`: it breaks profile resolution and packaging fails with a bare "An error has occurred".
+Without `js/local-config.js`, the build ships public defaults with telemetry off. The image includes a `dev` signing profile, making certificate setup unnecessary.
 
-### 4. Or deploy with a local Tizen Studio
+Do not run `tizen cli-config profiles.path=...` as it breaks profile resolution and causes packaging to fail.
+
+### 4. Deploy with Tizen Studio
 
 ```bash
 ./setup.sh     # asks for the Tizen Studio path, TV address and profile, writes .env
 ./deploy.sh    # stages the runtime files, packages, installs, launches
 ```
 
-`deploy.sh` packages from a staging directory, so tests, the simulator, the H264 map and the scripts never ship inside the `.wgt`.
+The `deploy.sh` script packages the staging directory while omitting tests, simulator files, the H264 map, and deployment scripts from the `.wgt` file.
 
----
+## Simulate
 
-## Running without a TV
-
-`simulate.html` mocks the Samsung APIs and plays the 1080p H264 variants, which browsers can decode:
+The `simulate.html` file mocks the Samsung APIs and plays browser-decodable H.264 1080p variants over local HTTP.
 
 ```bash
 python3 -m http.server 8080
 # open http://localhost:8080/simulate.html
 ```
 
-Keyboard: `Enter` opens the menu, `Space` pauses, `→` skips, `Esc` closes the menu. A 404 for `js/local-config.js` in the console is expected — that file is untracked and optional.
+| Key | Action |
+|---|---|
+| `Enter` | Open menu |
+| `Space` | Pause |
+| `→` | Skip |
+| `Esc` | Close menu |
 
-The simulator is the only way to exercise the app without hardware, so keep it working when you change the player.
+A console 404 error for `js/local-config.js` is expected because the file is optional and untracked.
 
----
+The simulator verifies application logic without hardware, so you should maintain the simulator when editing the player.
 
-## Tests
-
-```bash
-./test/run-all.sh
-```
-
-- `test/player.test.js` drives the player against stubbed Samsung APIs with controllable timers: cancellation of stale work, the retry ladder, watchdog coverage, category restarts, settings clamping and persistence.
-- `test/catalog-sync.test.sh` checks the generated data: every catalog URL has a thumbnail, no orphan thumbnails, no duplicate URLs, every URL is http, and the H264 map matches the catalog.
-
-A test here must fail if the behaviour it names is deleted. When you add one, delete the implementation line it covers and confirm the test goes red.
-
----
-
-## Remote control
+## Remote Control
 
 | Key | Action |
 |---|---|
-| `Enter` | Open the settings menu |
+| `Enter` | Open settings |
 | `→`, `Fast Forward`, `Ch+`, `Ch−` | Next video |
 | `Play` / `Pause` / `Play-Pause` | Pause and resume |
-| `Back`, `Stop` | Exit the app |
-| `1` `2` `3` `4` `5` | Reveal the developer rows in the menu |
+| `Back`, `Stop` | Exit app |
+| `12345` | Type `12345` to toggle the developer rows; typing it again hides them and turns the custom server off. |
+| `0` | Toggle on-screen debug board. Requires developer mode. |
 
-Inside the menu: `↑` `↓` move, `←` `→` change a value, `Enter` toggles, `Back` closes.
+The menu uses the following controls:
 
----
+| Key | Action |
+|---|---|
+| `↑` `↓` | Move |
+| `←` `→` | Change value |
+| `Enter` | Toggle |
+| `Back` | Close |
 
 ## Settings
 
 | Setting | Values | Notes |
 |---|---|---|
-| Show Description | On, Off | The overlay doubles as the loading indicator |
+| Show Description | On, Off | Controls description overlay |
 | Description Timer | 1–15s | Clamped on load |
-| Video Order | Shuffle, Sequential | Shuffle avoids repeating the current video |
-| Category | All, Space, Sea, Landscape, Cityscape | Changing it restarts the list |
+| Video Order | Shuffle, Sequential | Shuffle avoids repeating current video |
+| Category | All, Space, Sea, Landscape, Cityscape | Changing restarts list |
 | Use custom server | Yes, No | Developer rows only |
 | Files location | URL | Developer rows only |
+| Settings stored in | info, read-only | Displays active storage backend. Developer rows only. |
 
-### Playing from a LAN server
+### LAN Video Server
 
-Hosting the videos locally removes the CDN as a failure source. Create `js/local-config.js` (untracked; see `js/local-config.example.js`):
+Local hosting removes the CDN as a single point of failure. To enable it, create `js/local-config.js` via `js/local-config.example.js` and keep it untracked.
 
 ```js
 var AERIAL_LOCAL_SERVER = 'http://<host>:<port>';
 ```
 
-The app then defaults to that server with the catalog URL kept as a fallback, so a server that is down degrades to Apple's CDN instead of a black screen. Serve the files flat, named exactly as the catalog's basenames, with byte-range support.
+The application defaults to the local server while retaining the CDN catalog URL as a fallback. Serve the files flat, named exactly as the catalog basenames, from a server that supports byte ranges. The application uses the CDN if the server goes down.
 
 ### Telemetry
 
-Off by default and absent from the repository. To enable it, add credentials to the same untracked file:
+Telemetry defaults to off, and credentials are absent from the repository. You can enable it in `js/local-config.js`:
 
 ```js
 var AERIAL_TELEMETRY = { clientToken: '<datadog client token>', site: 'datadoghq.com' };
 ```
 
-Events: `app_start`, `buffering_complete` with a start-up duration, `avplay_failure` and `watchdog_timeout` with the URL, attempt and reason, and `video_skipped`. Failures also reach the console, so `sdb dlog` shows them without any external service.
+| Event | Details |
+|---|---|
+| `app_start` | App start |
+| `transition_ms` | Switch time to first buffered frame, URL |
+| `rebuffer_start` | Stall began, running count |
+| `rebuffer_end` | Stall ended, count, duration |
+| `playback_failure` | URL, URL index, attempt, retry count, phase, reason |
+| `video_skipped` | Every URL failed, consecutive-failure streak |
+| `category_empty` | Chosen category empty, full catalog used |
+| `storage_probe` | Storage backend probe |
+| `storage_probe_file` | File storage probe |
+| `storage_restored` | Storage restored |
+| `storage_restore_skipped` | Restore skipped |
+| `storage_write_error` | Storage write error |
 
----
+Failures show on the on-screen debug board, which `0` opens when developer mode is on, and reach the telemetry beacon when one is configured. This is necessary because console output cannot be retrieved from a retail TV.
+
+## Failure Handling
+
+The Apple CDN drops connections under load, which is handled via the following process:
+
+1. The application retries the URL twice with a 1s and then a 3s delay.
+2. Once retries are exhausted, the player tries the next URL from the LAN server, HTTP, and HTTPS options.
+3. When all URLs are exhausted, the video is skipped, and the skip delay starts at 2s before doubling per consecutive failure up to 60s.
+4. The first buffered video clears the failure streak.
+
+A 20-second watchdog detects missing preparation callbacks, incomplete initial buffering, and mid-video stalls. Any stalled stream restarts via the retry sequence. A paused video never trips the watchdog, which keeps re-arming until playback resumes.
+
+All failures are logged with the URL and reason so that a full catalog pass can identify unplayable videos per TV.
+
+## Storage
+
+The boot process probes the following backends:
+
+| Backend | Storage |
+|---|---|
+| `tizen.preference` | Tizen preferences |
+| wgt-private file | App-private file |
+| `localStorage` | Browser storage |
+
+The debug board reports the surviving backend post-reboot, and this persistence covers both settings and playback position.
+
+Note that `localStorage` is unreliable on the TV because Chromium commits lazily, causing pre-exit writes to be lost.
+
+## Code
+
+The scripts load in an exact order and share state via globals.
+
+| File | Responsibility |
+|---|---|
+| `js/local-config.js` | Untracked deployment values. LAN server, telemetry credentials. |
+| `js/storage.js` | Storage backends, ordered writes. |
+| `js/telemetry.js` | Event reporting. Silent, network-free unless configured. |
+| `js/catalog.js` | Generated `var CATALOG`. |
+| `js/settings.js` | Defaults, menu model. Persistence with range clamping. |
+| `js/player.js` | Playlist, AVPlay lifecycle. Preload, info overlay. Retries, watchdog. |
+| `js/menu.js` | Settings menu. LAN server test. |
+| `js/debug.js` | On-screen board, boot-time backend probe. |
+| `js/main.js` | Remote keys, app lifecycle, start-up. |
+
+The build process creates several generated artifacts: `js/catalog.js`, `js/h264map.js`, and `preload/*.webp`. A separate tool verifies CDN links and generates thumbnails from frames.
+
+You should hand-edit generated files for experiments only because regeneration overwrites any manual changes.
+
+## Tests
+
+The tests run in Node.js only, requiring no frameworks, network access, or TV hardware.
+
+```bash
+bash test/run-all.sh
+```
+
+| Suite | Coverage |
+|---|---|
+| `test/player.test.js` | Stale-work cancellation. Retries, watchdog. Category restarts. Settings clamping, persistence. |
+| `test/catalog-sync.test.sh` | Missing thumbnails and stray .jpg files; URL uniqueness and HTTP scheme; H264 map consistency including orphan keys. |
+
+The player suite runs the application in a `vm` context, stubs the Samsung APIs, and virtualizes the clock. The tests declare the expected delay directly, avoiding manual timer counts.
+
+A test fails when its named behavior is deleted, so you can verify coverage by deleting an implementation line and confirming the test fails.
 
 ## Troubleshooting
 
-**`install failed[118, -11] Author certificate not match`** — a build signed with a different author certificate is already installed. Remove it and install again:
+### `install failed[118, -11] Author certificate not match`
+
+This error occurs when the installed build uses a different certificate, and uninstalling the application will clear your settings.
 
 ```bash
 sdb -s <tv-ip>:26101 uninstall AerialScr0
 ```
 
-`tizen uninstall` and the `vd_uninstallapp` shell helpers fail silently here; the sdb subcommand is the one that works. Uninstalling clears the app's stored settings. Keep your author certificate after the first install, or every update will need this step.
+The `tizen uninstall` and `vd_uninstallapp` commands fail silently, so you must use `sdb`.
 
-**Every command times out** — the TV's address changed. See step 2.
+Make sure to retain the author certificate after the first install, as this prevents repeated removal.
 
-**Packaging fails with "An error has occurred"** — check `~/tizen-studio-data/cli/logs/cli.log`. A common cause is a `profiles.path` entry in the CLI config.
+### Every command times out
 
-**A video never starts** — the watchdog moves on after 20s. If it happens on every video, the catalog may be stale; regenerate it, or test one URL by hand with `ffprobe`.
+This issue indicates that the TV address has changed, meaning you must repeat install step 2.
 
-**The thumbnail stays on screen** — the app is waiting for AVPlay to report that buffering finished. Check the log for `avplay_failure`.
+### Packaging fails with "An error has occurred"
 
----
+Check `~/tizen-studio-data/cli/logs/cli.log` for details. The `profiles.path` setting in the CLI configuration usually causes this, so you should remove it.
+
+### A video never starts
+
+The watchdog triggers a retry after 20s, but the catalog might be stale if all videos fail. You can fix this by regenerating the catalog and testing the URL via `ffprobe`.
+
+### Thumbnail stays on screen
+
+The application awaits AVPlay buffering to complete, so you should check the logs for a `playback_failure` event.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: no build step, no dependencies, ES5-era syntax only (the runtime is Chromium 76), both test suites green, and generated files left alone.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+The project uses ES5 syntax for a Chromium 76 runtime, with no build steps and no dependencies. Please maintain the test passing state and ignore generated files.
+
+## Thanks
+
+This project was inspired by [xscreensaver-aerial](https://github.com/graysky2/xscreensaver-aerial) by graysky2.
+
+## Author
+
+Jean Souza · [Site](https://jeansouza.dev) · [GitHub](https://github.com/jeancarlos)
 
 ## License
 
-MIT. Apple's aerial videos are Apple's; this app only links to their public CDN.
+This software is licensed under the MIT License. Copyright (c) 2026 Jean.
+
+The Apple aerial videos belong to Apple, and this application simply links to their public CDN.
