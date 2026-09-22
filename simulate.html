@@ -14,6 +14,47 @@
       object-fit: cover;
       z-index: 1;
     }
+    img#sim-still {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 1;
+    }
+    #sim-note {
+      display: none;
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 30;
+      max-width: 520px;
+      background: rgba(0, 0, 0, 0.7);
+      color: rgba(255, 255, 255, 0.55);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 10px 14px;
+      border-radius: 8px;
+      text-align: right;
+    }
+    #gh-ribbon {
+      position: fixed;
+      top: 40px;
+      left: -68px;
+      z-index: 40;
+      width: 260px;
+      padding: 9px 0;
+      transform: rotate(-45deg);
+      background: rgba(0, 0, 0, 0.75);
+      color: rgba(255, 255, 255, 0.85);
+      text-align: center;
+      text-decoration: none;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+      font-size: 15px;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+    }
     #sim-keys {
       position: fixed;
       top: 16px;
@@ -41,6 +82,7 @@
 </head>
 <body>
   <video id="sim-video" muted></video>
+  <img id="sim-still" src="" alt="">
   <img id="preload" src="" alt="">
   <div id="fade"></div>
   <div id="loading">
@@ -69,6 +111,12 @@
     <div id="menu-items"></div>
     <div id="menu-hint">ESC to close</div>
   </div>
+  <div id="sim-note">
+    Still frames, not video. Apple serves the aerials over plain http and signs
+    https with a private CA, so a page served over https can load neither.
+    Everything else here is the app the TV runs.
+  </div>
+  <a id="gh-ribbon" href="https://github.com/jeancarlos/aerial-tizen" target="_blank" rel="noopener">See on GitHub</a>
   <div id="sim-keys">
     <strong>Keyboard</strong><br>
     <kbd>Enter</kbd> Menu &nbsp;
@@ -88,14 +136,24 @@
   // Uses H264 1080p URLs instead of HEVC 4K (browsers can't decode HEVC .mov)
 
   var simVideo = document.getElementById('sim-video');
+  var simStill = document.getElementById('sim-still');
   var simListener = {};
+
+  // Apple serves these videos over plain http and its https certificate is
+  // signed by a private Apple CA no browser trusts, so a page served over
+  // https can never load them. On https - GitHub Pages - the demo plays the
+  // catalog's thumbnails instead, which exercises the same state machine with
+  // nothing on the network.
+  var SIM_STILLS = location.protocol === 'https:' || /[?&]stills\b/.test(location.search);
+  var STILL_CLIP_MS = 8000;
+
+  if (SIM_STILLS) document.getElementById('sim-note').style.display = 'block';
 
   function toBrowserUrl(url) {
     return (typeof H264_MAP !== 'undefined' && H264_MAP[url]) || url;
   }
 
-  var webapis = {
-    avplay: {
+  var videoAvplay = {
       _state: 'NONE',
       open: function (url) {
         simVideo.src = toBrowserUrl(url);
@@ -138,8 +196,53 @@
       getState: function () {
         return this._state;
       }
-    }
   };
+
+  function stillsAvplay() {
+    var clip = null;
+    var buffered = false;
+    return {
+      _state: 'NONE',
+      open: function (url) {
+        simStill.src = getPreloadPath(url);
+        buffered = false;
+        this._state = 'IDLE';
+      },
+      setDisplayRect: function () {},
+      setStreamingProperty: function () {},
+      setListener: function (l) { simListener = l; },
+      prepareAsync: function (onSuccess, onError) {
+        var self = this;
+        simStill.onload = function () {
+          self._state = 'READY';
+          if (onSuccess) onSuccess();
+        };
+        simStill.onerror = function () {
+          if (onError) onError('no thumbnail for this video');
+        };
+        if (simStill.complete && simStill.naturalWidth) simStill.onload();
+      },
+      play: function () {
+        this._state = 'PLAYING';
+        if (!buffered) {
+          buffered = true;
+          if (simListener.onbufferingcomplete) simListener.onbufferingcomplete();
+        }
+        // ponytail: resuming restarts the clip rather than keeping the time
+        // left - a still has no playhead to resume from.
+        clearTimeout(clip);
+        clip = setTimeout(function () {
+          if (simListener.onstreamcompleted) simListener.onstreamcompleted();
+        }, STILL_CLIP_MS);
+      },
+      pause: function () { clearTimeout(clip); this._state = 'PAUSED'; },
+      stop: function () { clearTimeout(clip); this._state = 'NONE'; },
+      close: function () { this._state = 'NONE'; },
+      getState: function () { return this._state; }
+    };
+  }
+
+  var webapis = { avplay: SIM_STILLS ? stillsAvplay() : videoAvplay };
 
   // Buffering simulation
   simVideo.addEventListener('waiting', function () {
