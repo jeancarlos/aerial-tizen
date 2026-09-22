@@ -14,7 +14,7 @@ Thanks for wanting to help. This is a small app with unusual constraints, and mo
 
 ## Getting set up
 
-You do not need a TV to contribute.
+You do not need a TV to contribute. [DEVELOPMENT.md](DEVELOPMENT.md) covers the simulator, the debug board, telemetry and how the player recovers from failures.
 
 ```bash
 git clone <your fork>
@@ -44,7 +44,7 @@ Both suites must be green:
 ./test/run-all.sh
 ```
 
-`test/player.test.js` is a hand-rolled harness: it loads the real player scripts into a VM context with stubbed Samsung APIs and a controllable clock, so timers, retries and the watchdog are deterministic. `flush()` runs exactly the timers queued at that moment, which is how a cascade of retries is stepped through one stage at a time.
+`test/player.test.js` is a hand-rolled harness: it loads the real player scripts into a VM context with stubbed Samsung APIs and a virtual clock, so timers, retries and the watchdog are deterministic. `advance(ms)` fires whatever is due by then, in due order, so a test names the delay it is waiting for rather than counting timers, and a new `setTimeout` in the player does not disturb unrelated tests.
 
 **Write tests that would fail if the behaviour were deleted.** Prove it before you push: delete the implementation line your test covers, run that single test, confirm it goes red, restore the line. Two tests in this repo's history passed against deleted logic, which is worse than having no test, because it buys false confidence.
 
@@ -67,10 +67,10 @@ Never commit `js/local-config.js`. It holds your LAN address and, if you use tel
 
 ## Reporting a video that does not play
 
-Useful reports name the video and the failure, both of which the app logs:
+Useful reports name the video and the failure. Both are on the on-screen debug board:
 
 ```bash
-sdb -s <tv-ip>:26101 dlog | grep -i aerial
+0    # on the remote, with developer mode on
 ```
 
-Look for `avplay_failure` or `watchdog_timeout` lines, which carry the URL and the reason. Include your TV model and firmware year. "Some videos do not open" without the URLs cannot be acted on: the catalog is codec-uniform, so a failure is almost always the CDN or that specific file, not the decoder.
+The board is the only sink on a retail TV: the restricted sdb shell returns no console output, so `sdb dlog` will not show you anything. Look for `playback_failure` and `video_skipped`, which carry the URL and the reason. Include your TV model and firmware year. "Some videos do not open" without the URLs cannot be acted on: the catalog is codec-uniform, so a failure is almost always the CDN or that specific file, not the decoder.
