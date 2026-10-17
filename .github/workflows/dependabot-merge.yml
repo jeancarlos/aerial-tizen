@@ -1,0 +1,33 @@
+name: dependabot-merge
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+permissions: {}
+jobs:
+  merge:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.actor.login == 'dependabot[bot]' && startsWith(github.event.workflow_run.head_branch, 'dependabot/') && github.event.workflow_run.head_repository.full_name == github.repository && github.repository_owner == 'jeancarlos'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: merge patch and minor updates
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          pr=$(gh pr list --head "$HEAD_BRANCH" --base develop --json number --jq '.[0].number')
+          if [ -z "$pr" ]; then echo "no open PR into develop for $HEAD_BRANCH"; exit 0; fi
+          title=$(gh pr view "$pr" --json title --jq .title)
+          from=$(printf '%s' "$title" | sed -nE 's/.* from v?([0-9]+)[^ ]* to v?([0-9]+).*/\1/p')
+          to=$(printf '%s' "$title" | sed -nE 's/.* from v?([0-9]+)[^ ]* to v?([0-9]+).*/\2/p')
+          if [ -z "$from" ] || [ "$from" != "$to" ]; then
+            gh pr comment "$pr" --body "Major or unparsed version bump, merge by hand after reading the changelog."
+            exit 0
+          fi
+          gh pr merge "$pr" --merge --match-head-commit "$SHA"
+          gh workflow run ci.yml --ref develop
