@@ -13,6 +13,10 @@ echo "== catalog data =="
 if bash "$DIR/catalog-sync.test.sh"; then :; else failed=1; fi
 
 echo
+echo "== demo =="
+if bash "$DIR/demo.test.sh"; then :; else failed=1; fi
+
+echo
 if [ "$failed" -eq 0 ]; then
   echo "all suites passed"
 else

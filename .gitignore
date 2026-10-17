@@ -5,3 +5,4 @@ js/local-config.js
 author-signature.xml
 signature1.xml
 .env
+preload/
