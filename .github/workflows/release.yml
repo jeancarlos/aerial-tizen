@@ -1,0 +1,28 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+      - name: package and sign
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git archive --format=zip --prefix="aerial-tizen-${TAG}/" -o "aerial-tizen-${TAG}.zip" HEAD
+          cosign sign-blob --yes --bundle "aerial-tizen-${TAG}.zip.sigstore.json" "aerial-tizen-${TAG}.zip"
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" "aerial-tizen-${TAG}.zip" "aerial-tizen-${TAG}.zip.sigstore.json" --title "$TAG" --generate-notes

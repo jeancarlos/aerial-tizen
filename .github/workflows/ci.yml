@@ -18,6 +18,10 @@ jobs:
           for f in *.sh demo/*.sh test/*.sh tools/*.sh; do bash -n "$f"; done
       - name: tests
         run: bash test/run-all.sh
+      - name: fuzz settings
+        run: |
+          npm ci --ignore-scripts
+          npm run fuzz
   reuse:
     runs-on: ubuntu-latest
     steps:
@@ -27,5 +31,5 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
-      - run: python -m pip install reuse==5.0.2
+      - run: python -m pip install --require-hashes -r .github/requirements/reuse.txt
       - run: reuse lint
