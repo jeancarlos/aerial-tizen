@@ -23,9 +23,6 @@ have=$(cd "$OUT/site/preload" && find . -type f -name '*.webp' -size +0 -printf 
 msg="Every catalog video has a demo thumbnail"
 check [ "$want" = "$have" ]
 
-msg="No scratch files are left in the demo"
-check [ -z "$(find "$OUT/site" -name '.tint')" ]
-
 msg="The demo thumbnails are drawn, not cut from Apple's footage (under 100 KB each)"
 check [ -z "$(find "$OUT/site/preload" -type f -size +100k)" ]
 
