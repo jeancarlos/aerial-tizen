@@ -1,0 +1,28 @@
+name: promote
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [develop]
+permissions: {}
+jobs:
+  promote:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.repository_owner == 'jeancarlos'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: open the release PR and merge it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ "$(gh api "repos/$GH_REPO/branches/develop" --jq .commit.sha)" != "$SHA" ]; then echo "develop moved on, a newer run will promote"; exit 0; fi
+          if [ "$(gh api "repos/$GH_REPO/compare/main...$SHA" --jq .ahead_by)" -eq 0 ]; then echo "main is up to date"; exit 0; fi
+          pr=$(gh pr list --base main --head develop --json number --jq '.[0].number')
+          if [ -z "$pr" ]; then
+            pr=$(gh pr create --base main --head develop --title "Release: $(date -u +%Y-%m-%d) develop to main" --body "Promoted automatically after CI passed on develop." | grep -o '[0-9]*$')
+          fi
+          gh pr merge "$pr" --merge

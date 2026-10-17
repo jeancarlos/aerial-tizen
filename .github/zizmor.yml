@@ -1,0 +1,4 @@
+rules:
+  dangerous-triggers:
+    ignore:
+      - promote.yml:3
