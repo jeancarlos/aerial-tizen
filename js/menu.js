@@ -124,48 +124,57 @@ function applySetting(key, value) {
   renderMenu();
 }
 
+function nextOption(item, current, direction) {
+  var idx = 0;
+  for (var i = 0; i < item.options.length; i++) {
+    if (item.options[i].value === current) idx = i;
+  }
+  return item.options[(idx + direction + item.options.length) % item.options.length].value;
+}
+
+function menuChangeToggle(item, current, direction) {
+  var nextValue = nextOption(item, current, direction);
+  if (item.key !== 'customServerEnabled' || nextValue !== true) {
+    applySetting(item.key, nextValue);
+    return;
+  }
+  menuBusyKey = item.key;
+  renderMenu();
+  testConnection(settings.customServerUrl, function (success) {
+    menuBusyKey = null;
+    applySetting(item.key, success);
+    if (!success) alert('Could not reach custom server. Test failed.');
+  });
+}
+
+function menuChangeNumber(item, current, direction) {
+  var val = current + direction * item.step;
+  if (val < item.min) val = item.max;
+  if (val > item.max) val = item.min;
+  applySetting(item.key, val);
+}
+
+function menuChangeText(item, current) {
+  var newVal = prompt('Enter files location URL', current);
+  if (!newVal) return;
+  menuBusyKey = item.key;
+  renderMenu();
+  testConnection(newVal, function (success) {
+    menuBusyKey = null;
+    if (success) {
+      applySetting(item.key, newVal);
+    } else {
+      renderMenu();
+      alert('Could not reach ' + newVal + '. URL not updated.');
+    }
+  });
+}
+
+var MENU_CHANGERS = { toggle: menuChangeToggle, number: menuChangeNumber, text: menuChangeText };
+
 function menuChangeValue(direction) {
   if (menuBusyKey) return;
   var item = getVisibleMenuItems()[menuIndex];
-  if (item.type === 'info') return;
-  var current = settings[item.key];
-
-  if (item.type === 'toggle') {
-    var idx = 0;
-    for (var i = 0; i < item.options.length; i++) {
-      if (item.options[i].value === current) idx = i;
-    }
-    var nextValue = item.options[(idx + direction + item.options.length) % item.options.length].value;
-
-    if (item.key === 'customServerEnabled' && nextValue === true) {
-      menuBusyKey = item.key;
-      renderMenu();
-      testConnection(settings.customServerUrl, function (success) {
-        menuBusyKey = null;
-        applySetting(item.key, success);
-        if (!success) alert('Could not reach custom server. Test failed.');
-      });
-      return;
-    }
-    applySetting(item.key, nextValue);
-  } else if (item.type === 'number') {
-    var val = current + direction * item.step;
-    if (val < item.min) val = item.max;
-    if (val > item.max) val = item.min;
-    applySetting(item.key, val);
-  } else if (item.type === 'text') {
-    var newVal = prompt('Enter files location URL', current);
-    if (!newVal) return;
-    menuBusyKey = item.key;
-    renderMenu();
-    testConnection(newVal, function (success) {
-      menuBusyKey = null;
-      if (success) {
-        applySetting(item.key, newVal);
-      } else {
-        renderMenu();
-        alert('Could not reach ' + newVal + '. URL not updated.');
-      }
-    });
-  }
+  var change = MENU_CHANGERS[item.type];
+  if (change) change(item, settings[item.key], direction);
 }

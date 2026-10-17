@@ -515,4 +515,61 @@ const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS, ERROR_SKIP_MS, MAX_
   assert.deepStrictEqual(asked, listed, 'the generator must cut exactly the files the player asks for');
 }
 
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); menuIndex = getVisibleMenuItems().findIndex(function (i) { return i.key === 'descriptionTimer'; }); settings.descriptionTimer = 15; menuChangeValue(1);", t.ctx);
+  assert.strictEqual(t.ctx.settings.descriptionTimer, 1, 'a number past its max must wrap to its min');
+  vm.runInContext("menuChangeValue(-1);", t.ctx);
+  assert.strictEqual(t.ctx.settings.descriptionTimer, 15, 'a number below its min must wrap to its max');
+  vm.runInContext("menuChangeValue(-1);", t.ctx);
+  assert.strictEqual(t.ctx.settings.descriptionTimer, 14, 'a number inside its range moves by one step');
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); menuIndex = getVisibleMenuItems().findIndex(function (i) { return i.key === 'videoOrder'; }); settings.videoOrder = 'sequential'; menuChangeValue(1);", t.ctx);
+  assert.strictEqual(t.ctx.settings.videoOrder, 'shuffle', 'a toggle past its last option must wrap to the first');
+  vm.runInContext("menuChangeValue(-1);", t.ctx);
+  assert.strictEqual(t.ctx.settings.videoOrder, 'sequential', 'a toggle before its first option must wrap to the last');
+}
+
+{
+  const t = boot();
+  vm.runInContext("loadSettings(); settings.devMode = true; menuIndex = getVisibleMenuItems().findIndex(function (i) { return i.key === 'customServerUrl'; });", t.ctx);
+  t.ctx.prompt = () => '';
+  const before = t.ctx.settings.customServerUrl;
+  vm.runInContext("menuChangeValue(1);", t.ctx);
+  assert.strictEqual(t.ctx.settings.customServerUrl, before, 'an empty prompt answer must leave the URL alone');
+  assert.strictEqual(vm.runInContext('menuBusyKey', t.ctx), null, 'and must not start a connection test');
+}
+
+{
+  const t = boot();
+  vm.runInContext("telemetryConfig = { clientToken: 'tok' }; telemetryStarted = Date.now(); telemetryQueue = []; telemetryLog = [];", t.ctx);
+  t.ctx.realTelemetry('playback_failure', { url: 'http://x/v.mov', reason: 'boom' });
+  const queued = JSON.parse(vm.runInContext('JSON.stringify(telemetryQueue)', t.ctx));
+  assert.strictEqual(queued.length, 1, 'an enabled client must queue the event');
+  assert.strictEqual(queued[0].event, 'playback_failure');
+  assert.strictEqual(queued[0].status, 'error', 'a playback failure must be marked as an error');
+  assert.strictEqual(queued[0].url, 'http://x/v.mov', 'event fields must ride along in the payload');
+  assert.strictEqual(queued[0].ddsource, 'tizen');
+  const line = vm.runInContext('telemetryRecent(1)[0]', t.ctx);
+  assert.ok(/playback_failure .*reason=boom/.test(line), 'the debug board line must carry the fields: ' + line);
+}
+
+{
+  const t = boot();
+  vm.runInContext("telemetryConfig = null; telemetryQueue = []; telemetryLog = [];", t.ctx);
+  t.ctx.realTelemetry('app_start', {});
+  assert.strictEqual(vm.runInContext('telemetryQueue.length', t.ctx), 0, 'without a client token nothing may be queued');
+  assert.strictEqual(vm.runInContext('telemetryRecent(5).length', t.ctx), 1, 'but the debug board still records the event');
+}
+
+{
+  const t = boot();
+  vm.runInContext("telemetryConfig = { clientToken: 'tok' }; telemetryQueue = []; telemetryLog = [];", t.ctx);
+  for (let i = 0; i < 50; i++) t.ctx.realTelemetry('e' + i, {});
+  assert.strictEqual(vm.runInContext('telemetryQueue.length', t.ctx), 0, 'a full queue must flush');
+}
+
 console.log('player tests passed');
