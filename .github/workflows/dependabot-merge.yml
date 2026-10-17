@@ -6,7 +6,7 @@ on:
 permissions: {}
 jobs:
   merge:
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.actor.login == 'dependabot[bot]' && startsWith(github.event.workflow_run.head_branch, 'dependabot/') && github.repository_owner == 'jeancarlos'
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.actor.login == 'dependabot[bot]' && startsWith(github.event.workflow_run.head_branch, 'dependabot/') && github.event.workflow_run.head_repository.full_name == github.repository && github.repository_owner == 'jeancarlos'
     runs-on: ubuntu-latest
     permissions:
       contents: write
