@@ -504,4 +504,15 @@ const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS, ERROR_SKIP_MS, MAX_
   assert.ok(t.elements.loading.classes.has('visible'), 'but a stream that keeps failing must bring it back');
 }
 
+{
+  const t = boot();
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../js/catalog.js'), 'utf8'), t.ctx);
+  const listed = require('child_process')
+    .execFileSync('bash', [path.join(__dirname, '../tools/make-thumbs.sh'), '--list'], { encoding: 'utf8' })
+    .split('\n').filter(Boolean);
+  const asked = JSON.parse(vm.runInContext("JSON.stringify(CATALOG.map(function (v) { return getPreloadPath(v.url).replace('preload/', ''); }))", t.ctx));
+  assert.ok(asked.length > 0);
+  assert.deepStrictEqual(asked, listed, 'the generator must cut exactly the files the player asks for');
+}
+
 console.log('player tests passed');
