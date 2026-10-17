@@ -85,38 +85,20 @@ else
 fi
 
 # ── Thumbnail checks ──
+# The frames are Apple's footage: they are cut locally and must never be tracked.
 
 echo ""
 echo "Thumbnail checks:"
 
-missing_thumbs=""
-while read -r url; do
-  thumb="$ROOT/preload/$(basename "$url" .mov | sed 's/$/.webp/')"
-  [ -f "$thumb" ] || missing_thumbs="$missing_thumbs$thumb\n"
-done <<< "$catalog_urls"
+msg="No file under preload/ is tracked by git"
+check [ -z "$(git -C "$ROOT" ls-files preload)" ]
 
-msg="Every catalog URL has a preload/*.webp thumbnail"
-if [ -z "$missing_thumbs" ]; then
-  ok "$msg"
-else
-  fail "$msg:"
-  printf "$missing_thumbs" | sed 's/^/    /'
-fi
+msg="preload/ is gitignored"
+check git -C "$ROOT" check-ignore -q preload/anything.webp
 
-want_thumbs=$(while read -r url; do basename "$url" .mov | sed 's/$/.webp/'; done <<< "$catalog_urls" | sort)
-have_thumbs=$(find "$ROOT/preload" -name '*.webp' -printf '%f\n' | sort)
-orphan_thumbs=$(comm -13 <(echo "$want_thumbs") <(echo "$have_thumbs"))
-msg="No preload thumbnails without a catalog entry"
-if [ -z "$orphan_thumbs" ]; then
-  ok "$msg"
-else
-  n=$(echo "$orphan_thumbs" | wc -l)
-  fail "$msg — $n orphan:"
-  echo "$orphan_thumbs" | sed 's/^/    /'
-fi
-
-msg="No leftover .jpg thumbnails"
-check [ "$(find "$ROOT/preload" -name '*.jpg' | wc -l)" -eq 0 ]
+msg="The thumbnail generator lists one name per catalog URL"
+want_thumbs=$(while read -r url; do basename "$url" | sed -E 's/\.(mov|mp4)$/.webp/'; done <<< "$catalog_urls" | sort)
+check [ "$(bash "$ROOT/tools/make-thumbs.sh" --list | sort)" = "$want_thumbs" ]
 
 # ── Summary ──
 total=$((passed + failed))

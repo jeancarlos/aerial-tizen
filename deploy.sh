@@ -32,6 +32,7 @@ if [ -f "$DIR/js/local-config.js" ]; then
 else
   echo "(no js/local-config.js: shipping public defaults, telemetry off)"
 fi
+bash "$DIR/tools/make-thumbs.sh"
 cp -r "$DIR/preload" "$STAGE/preload"
 
 echo "==> Packaging..."
