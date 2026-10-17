@@ -6,3 +6,4 @@ author-signature.xml
 signature1.xml
 .env
 preload/
+node_modules/
