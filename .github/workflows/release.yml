@@ -20,17 +20,19 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: |
-          git archive --format=zip --prefix="aerial-tizen-${TAG}/" -o "aerial-tizen-${TAG}.zip" HEAD
-          cosign sign-blob --yes --bundle "aerial-tizen-${TAG}.zip.sigstore.json" "aerial-tizen-${TAG}.zip"
+          name="aerial-tizen-${TAG//\//-}"
+          git archive --format=zip --prefix="${name}/" -o "${name}.zip" HEAD
+          cosign sign-blob --yes --bundle "${name}.zip.sigstore.json" "${name}.zip"
       - name: verify signature
         env:
           TAG: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
         run: |
-          cosign verify-blob --bundle "aerial-tizen-${TAG}.zip.sigstore.json" \
+          name="aerial-tizen-${TAG//\//-}"
+          cosign verify-blob --bundle "${name}.zip.sigstore.json" \
             --certificate-identity-regexp "^https://github.com/${REPO}/" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            "aerial-tizen-${TAG}.zip"
+            "${name}.zip"
       - name: publish
         if: github.ref_type == 'tag'
         env:
