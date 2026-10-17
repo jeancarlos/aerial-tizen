@@ -2,7 +2,7 @@
 
 Apple TV's aerial screensavers, running natively on a Samsung TV. 115 videos streamed from Apple's CDN and decoded in hardware as HEVC 4K through Samsung's AVPlay.
 
-[**Try the demo**](https://jeancarlos.github.io/aerial-tizen/) — the real app in your browser, no TV needed.
+[**Try the demo**](https://jeancarlos.github.io/aerial-tizen/) - the real app in your browser, no TV needed.
 
 ![Aerial running in the browser demo](docs/screenshot.png)
 
@@ -88,7 +88,7 @@ In the settings menu, `↑` and `↓` move, `←` and `→` change a value, `Ent
 | Setting | Values | Notes |
 |---|---|---|
 | Show Description | On, Off | The title and description overlay |
-| Description Timer | 1–15s | How long the overlay stays up |
+| Description Timer | 1-15s | How long the overlay stays up |
 | Video Order | Shuffle, Sequential | Shuffle never repeats the video that just played |
 | Category | All, Space, Sea, Landscape, Cityscape | Changing it restarts playback in the new category |
 
@@ -96,7 +96,7 @@ Settings and the last video played survive a reboot.
 
 ## Troubleshooting
 
-**`install failed[118, -11] Author certificate not match`** — a build signed with a different certificate is already installed. Remove it and install again. This clears the app's stored settings.
+**`install failed[118, -11] Author certificate not match`** - a build signed with a different certificate is already installed. Remove it and install again. This clears the app's stored settings.
 
 ```bash
 sdb -s <tv-ip>:26101 uninstall AerialScr0
@@ -104,11 +104,11 @@ sdb -s <tv-ip>:26101 uninstall AerialScr0
 
 Use `sdb` for this. `tizen uninstall` and `vd_uninstallapp` fail silently here. Keep your author certificate after the first install and you will not hit this again.
 
-**Every command times out** — the TV's address changed. Repeat step 2.
+**Every command times out** - the TV's address changed. Repeat step 2.
 
-**Packaging fails with "An error has occurred"** — look in `~/tizen-studio-data/cli/logs/cli.log`. A `profiles.path` entry in the CLI config is the usual cause.
+**Packaging fails with "An error has occurred"** - look in `~/tizen-studio-data/cli/logs/cli.log`. A `profiles.path` entry in the CLI config is the usual cause.
 
-**A video never starts** — the app retries the video on its own and moves to the next one when it runs out of options, so a single bad file costs you nothing but a pause. If every video fails, the catalog is likely stale; open an issue.
+**A video never starts** - the app retries the video on its own and moves to the next one when it runs out of options, so a single bad file costs you nothing but a pause. If every video fails, the catalog is likely stale; open an issue.
 
 ## Development
 
@@ -120,7 +120,13 @@ Inspired by [xscreensaver-aerial](https://github.com/graysky2/xscreensaver-aeria
 
 ## Author
 
-Jean Souza — [jeansouza.dev](https://jeansouza.dev) · [github.com/jeancarlos](https://github.com/jeancarlos)
+Jean Souza - [jeansouza.dev](https://jeansouza.dev) · [github.com/jeancarlos](https://github.com/jeancarlos)
+
+## Trademarks
+
+Apple, Apple TV and Aerial are trademarks of Apple Inc. Samsung and Smart TV are trademarks of Samsung Electronics Co., Ltd. Tizen is a trademark of the Linux Foundation. This project is independent: it is not affiliated with, endorsed by or sponsored by Apple, Samsung or the Linux Foundation, and it uses their names only to say what it works with.
+
+The videos belong to Apple and are streamed from Apple's public CDN. The repository contains no Apple footage: the transition thumbnails are cut on your own machine by `tools/make-thumbs.sh`.
 
 ## License
 
