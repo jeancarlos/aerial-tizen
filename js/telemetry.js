@@ -61,7 +61,7 @@ function telemetryProbe(query) {
   console.warn('[telemetry] probe sent to', url);
 }
 
-function telemetry(event, fields) {
+function telemetryPayload(event, fields) {
   var payload = {
     ddsource: 'tizen',
     service: (telemetryConfig && telemetryConfig.service) || 'aerial-tizen',
@@ -73,28 +73,35 @@ function telemetry(event, fields) {
   for (var key in fields) {
     if (fields.hasOwnProperty(key)) payload[key] = fields[key];
   }
+  if (event === 'playback_failure') payload.status = 'error';
+  return payload;
+}
 
+function telemetryLine(event, fields) {
   var line = Math.round((Date.now() - telemetryStarted) / 1000) + 's ' + event;
   for (var f in fields) {
     if (fields.hasOwnProperty(f)) line += ' ' + f + '=' + String(fields[f]).slice(-42);
   }
+  return line;
+}
+
+function telemetryRecord(line) {
   telemetryLog.push(line);
   if (telemetryLog.length > TELEMETRY_LOG_MAX) telemetryLog.shift();
   if (typeof debugRender === 'function') debugRender();
+}
 
-  if (event === 'playback_failure') {
-    payload.status = 'error';
-    console.warn('[telemetry]', event, JSON.stringify(fields || {}));
-  }
-
-  if (!telemetryEnabled()) return;
-
+function telemetryEnqueue(payload) {
   telemetryQueue.push(payload);
   if (telemetryQueue.length >= TELEMETRY_MAX_QUEUE) {
     telemetryFlush();
-    return;
-  }
-  if (!telemetryTimer) {
+  } else if (!telemetryTimer) {
     telemetryTimer = setTimeout(telemetryFlush, TELEMETRY_FLUSH_MS);
   }
+}
+
+function telemetry(event, fields) {
+  telemetryRecord(telemetryLine(event, fields));
+  if (event === 'playback_failure') console.warn('[telemetry]', event, JSON.stringify(fields || {}));
+  if (telemetryEnabled()) telemetryEnqueue(telemetryPayload(event, fields));
 }
