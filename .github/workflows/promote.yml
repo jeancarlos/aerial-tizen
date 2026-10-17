@@ -12,6 +12,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write
     steps:
       - name: open the release PR and merge it
         env:
@@ -26,3 +27,5 @@ jobs:
             pr=$(gh pr create --base main --head develop --title "Release: $(date -u +%Y-%m-%d) develop to main" --body "Promoted automatically after CI passed on develop." | grep -o '[0-9]*$')
           fi
           gh pr merge "$pr" --merge --match-head-commit "$SHA"
+          gh workflow run pages.yml --ref main
+          gh workflow run security.yml --ref main
