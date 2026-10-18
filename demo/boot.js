@@ -34,6 +34,10 @@ function simFadeKeys(doc) {
   if (keys) keys.classList.add('fade');
 }
 
+function simWireCatalogButton(doc) {
+  doc.getElementById('catalog-button').addEventListener('click', function () { toggleCatalogList(); });
+}
+
 var tizen = simCreateTizen(document);
 var webapis = {
   avplay: simCreateAvplay(
@@ -45,3 +49,4 @@ var webapis = {
 };
 document.addEventListener('keydown', function (e) { simOnKeydown(e, document); }, true);
 document.addEventListener('keydown', function () { simFadeKeys(document); }, {once: true});
+simWireCatalogButton(document);

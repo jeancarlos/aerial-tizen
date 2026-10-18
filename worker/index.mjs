@@ -1,6 +1,7 @@
 const UPSTREAM = 'http://sylvan.apple.com';
 const PATH = /^\/(Aerials\/2x\/)?Videos\/[\w.-]+\.(mov|mp4)$/;
 const ALLOWED_ORIGINS = ['https://aerial.jeansouza.dev', 'http://localhost:8000', 'http://127.0.0.1:8000'];
+const HARDENING = { 'x-content-type-options': 'nosniff' };
 const PASSED = ['content-type', 'content-length', 'content-range', 'accept-ranges', 'etag', 'last-modified'];
 
 export function originOf(request) {
@@ -18,9 +19,10 @@ export function originOf(request) {
 export function makeHandler(upstreamFetch) {
   return async function handle(request) {
     const origin = originOf(request);
-    if (!origin || ALLOWED_ORIGINS.indexOf(origin) < 0) return new Response('forbidden', { status: 403 });
+    if (!origin || ALLOWED_ORIGINS.indexOf(origin) < 0) return new Response('forbidden', { status: 403, headers: HARDENING });
 
     const cors = {
+      ...HARDENING,
       'access-control-allow-origin': origin,
       'access-control-allow-headers': 'range',
       'access-control-expose-headers': 'content-length, content-range, accept-ranges',

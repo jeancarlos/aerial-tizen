@@ -24,6 +24,7 @@ const ask = (url, headers, method) => handle(new Request(url, { method: method |
   assert.strictEqual(res.headers.get('x-apple-request-uuid'), null, 'upstream headers are not passed through');
   assert.strictEqual(res.headers.get('set-cookie'), null);
   assert.strictEqual(res.headers.get('accept-ranges'), 'bytes');
+  assert.strictEqual(res.headers.get('x-content-type-options'), 'nosniff', 'the browser must not sniff the video into another type');
 }
 
 {
@@ -42,6 +43,7 @@ const ask = (url, headers, method) => handle(new Request(url, { method: method |
   for (const headers of [{}, { origin: 'https://evil.example' }, { referer: 'https://evil.example/' }, { referer: 'not a url' }, { origin: PAGE + '.evil.example' }]) {
     const res = await ask(FILE, headers);
     assert.strictEqual(res.status, 403, 'only the demo origins may use the proxy: ' + JSON.stringify(headers));
+    assert.strictEqual(res.headers.get('x-content-type-options'), 'nosniff', 'refusals are not sniffed either');
   }
   assert.strictEqual(calls.length, before, 'a refused request never reaches Apple');
 }

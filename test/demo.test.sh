@@ -26,6 +26,12 @@ check [ "$want" = "$have" ]
 msg="No demo thumbnail is larger than 200 KB"
 check [ -z "$(find "$OUT/site/preload" -type f -size +200k)" ]
 
+msg="The demo page restricts scripts to its own origin"
+check grep -q "http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'self'" "$OUT/site/index.html"
+
+msg="The demo page has no inline event handler for the policy to block"
+check [ -z "$(grep -c ' onclick=' "$OUT/site/index.html" | grep -v "^0$")" ]
+
 msg="The demo page loads the list script it ships"
 check grep -q 'src="list.js"' "$OUT/site/index.html"
 

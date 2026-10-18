@@ -18,10 +18,14 @@ cp "$DIR/demo/list.js" "$DIR/demo/keys.js" "$DIR/demo/proxy.js" "$DIR/demo/confi
   "$DIR/demo/favicon.ico" "$DIR/demo/manifest.webmanifest" "$OUT/"
 cp -r "$DIR/demo/icons" "$OUT/"
 
+PROXY="$(sed -n "s/.*DEMO_PROXY = '\(.*\)';.*/\1/p" "$DIR/demo/config.js")"
+CSP="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' $PROXY http://sylvan.apple.com https://sylvan.apple.com; manifest-src 'self'; base-uri 'none'; form-action 'none'"
+
 # The page is the app's own index.html with the TV-only parts swapped for the
 # browser stand-ins, so a new element in the app reaches the demo untouched.
 sed \
   -e 's|<title>Aerial Screensaver</title>|<title>Aerial Screensaver - Simulator</title>|' \
+  -e "s|<meta charset=\"UTF-8\">|&\n  <meta http-equiv=\"Content-Security-Policy\" content=\"$CSP\">|" \
   -e 's|<link rel="stylesheet" href="css/style.css">|&\n  <link rel="stylesheet" href="sim.css">|' \
   -e '/sim.css/r '"$DIR/demo/head.html" \
   -e '/<body>/r '"$DIR/demo/body-top.html" \

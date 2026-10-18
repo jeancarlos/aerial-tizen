@@ -193,6 +193,11 @@ function recorder() {
   assert.strictEqual(dispatched.length, 3, 'Esc on an open list does not reach the menu');
   assert.deepStrictEqual(key(65, 'INPUT'), ['stop'], 'typing in the filter is swallowed');
 
+  let clickHandler;
+  ctx.simWireCatalogButton({ getElementById: id => (id === 'catalog-button' ? { addEventListener: (type, fn) => { assert.strictEqual(type, 'click'); clickHandler = fn; } } : null) });
+  clickHandler();
+  assert.strictEqual(toggled, 3, 'the All videos button toggles the list without an inline handler');
+
   const keys = { classList: { add: c => classes.add('keys-' + c) } };
   ctx.simFadeKeys({ getElementById: () => keys });
   assert.ok(classes.has('keys-fade'), 'the key help fades');
