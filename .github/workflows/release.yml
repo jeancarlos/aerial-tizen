@@ -45,7 +45,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           name="aerial-tizen-${TAG//\//-}"
-          git archive --format=zip --prefix="${name}/" -o "${name}.zip" HEAD
+          git archive --format=zip -0 --prefix="${name}/" -o "${name}.zip" HEAD
           cosign sign-blob --yes --bundle "${name}.zip.sigstore.json" "${name}.zip"
       - name: verify signature
         env:

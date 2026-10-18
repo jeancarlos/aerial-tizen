@@ -141,6 +141,15 @@ cosign verify-blob --bundle aerial-tizen-vX.Y.Z.zip.sigstore.json \
   aerial-tizen-vX.Y.Z.zip
 ```
 
+### Rebuild a release yourself
+
+The archive is built by `git archive` with files stored uncompressed, so the same tag gives the same bytes on any machine. Compare your build with the published asset:
+
+```bash
+git archive --format=zip -0 --prefix=aerial-tizen-vX.Y.Z/ vX.Y.Z | sha256sum
+sha256sum aerial-tizen-vX.Y.Z.zip
+```
+
 ## Development
 
 [DEVELOPMENT.md](DEVELOPMENT.md) covers running the app without a TV, the developer menu and on-screen debug board, playing from your own LAN server, telemetry, and how the player recovers from failures. [CONTRIBUTING.md](CONTRIBUTING.md) covers the constraints a patch has to respect.

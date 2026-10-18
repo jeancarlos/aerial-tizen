@@ -61,6 +61,10 @@ echo "== release notes =="
 if bash "$DIR/release-notes.test.sh"; then :; else failed=1; fi
 
 echo
+echo "== reproducible release =="
+if bash "$DIR/reproducible.test.sh"; then :; else failed=1; fi
+
+echo
 echo "== demo =="
 if bash "$DIR/demo.test.sh"; then :; else failed=1; fi
 
