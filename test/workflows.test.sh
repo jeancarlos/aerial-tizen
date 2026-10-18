@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 fails=0
@@ -15,7 +17,7 @@ check "ci uploads the coverage percent" has ci.yml 'name: coverage-percent'
 check "badge publishes to the badges branch" has badge.yml 'HEAD:badges'
 check "badge only runs after ci on main" has badge.yml 'branches: [main]'
 check "c8 writes the json summary" grep -q json-summary "$ROOT/.c8rc.json"
-check "zizmor ignores the badge trigger" grep -qF "badge.yml:3" "$ROOT/.github/zizmor.yml"
+check "zizmor ignores the badge trigger" grep -qF "badge.yml:5" "$ROOT/.github/zizmor.yml"
 check "ci runs the linter" has ci.yml 'npm run lint'
 check "lint script exists" grep -q '"lint": "eslint .' "$ROOT/package.json"
 check "release pins the signing identity" has release.yml 'workflows/release.yml@${REF}'

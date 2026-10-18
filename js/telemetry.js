@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Jean
+// SPDX-License-Identifier: MIT
 var TELEMETRY_FLUSH_MS = 10000;
 var TELEMETRY_MAX_QUEUE = 50;
 

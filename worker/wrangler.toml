@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 name = "aerial-proxy"
 main = "index.mjs"
 compatibility_date = "2026-10-01"

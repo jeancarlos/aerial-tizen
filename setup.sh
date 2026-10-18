@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 set -uo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"

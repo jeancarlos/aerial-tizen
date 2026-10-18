@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 set -euo pipefail
 
 nothing() { printf 'Nothing installed. %s\n' "$*" >&2; exit 1; }

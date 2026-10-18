@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # Test: the release archive is bit-for-bit reproducible from the commit
 set -euo pipefail
 

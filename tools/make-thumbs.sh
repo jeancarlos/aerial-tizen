@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # Cuts one transition thumbnail per catalog video into preload/.
 #
 #   bash tools/make-thumbs.sh          cut the ones that are missing

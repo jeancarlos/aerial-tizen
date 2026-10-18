@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # Test: ci-local drops the git hook environment so a linked worktree is not rewritten by the suites
 set -euo pipefail
 

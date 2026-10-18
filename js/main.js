@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Jean
+// SPDX-License-Identifier: MIT
 var DEV_TARGET_SEQUENCE = '12345';
 var devSequence = '';
 

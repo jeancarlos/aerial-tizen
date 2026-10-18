@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 #
 # Assembles the public demo. The same script builds it in CI and locally, so
 # what you check in a browser is what GitHub Pages serves.

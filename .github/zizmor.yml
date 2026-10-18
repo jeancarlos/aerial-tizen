@@ -1,6 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 rules:
   dangerous-triggers:
     ignore:
-      - promote.yml:3
-      - dependabot-merge.yml:3
-      - badge.yml:3
+      - promote.yml:5
+      - dependabot-merge.yml:5
+      - badge.yml:5

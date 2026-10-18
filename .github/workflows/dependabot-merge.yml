@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 name: dependabot-merge
 on:
   workflow_run:

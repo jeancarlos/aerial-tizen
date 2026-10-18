@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Jean
+// SPDX-License-Identifier: MIT
 // Durable storage for a Tizen TV app, most durable backend first.
 //
 // localStorage alone is not enough: Chromium commits it lazily, so a value

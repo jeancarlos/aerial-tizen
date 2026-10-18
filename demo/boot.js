@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Jean
+// SPDX-License-Identifier: MIT
 function simCreateTizen(doc) {
   return {
     tvinputdevice: { registerKey: function () {} },

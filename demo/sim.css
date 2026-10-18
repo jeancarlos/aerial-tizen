@@ -1,3 +1,7 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Jean
+ * SPDX-License-Identifier: MIT
+ */
 video#sim-video {
   position: fixed;
   inset: -2px;

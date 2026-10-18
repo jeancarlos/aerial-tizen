@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # One-command deploy to a Samsung Tizen TV.
 #
 #   ./tvdeploy.sh                 discover the TV, package, install, launch

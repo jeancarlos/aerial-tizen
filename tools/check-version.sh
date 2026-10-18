@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # Fails unless config.xml, package.json and package-lock.json carry the same
 # version, and, when a tag is given, unless the tag is v<that version>.
 #

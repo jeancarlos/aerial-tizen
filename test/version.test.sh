@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # Test: the three version fields agree and the release guard rejects a wrong tag
 set -euo pipefail
 

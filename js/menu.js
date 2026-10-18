@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Jean
+// SPDX-License-Identifier: MIT
 var menuOpen = false;
 var menuIndex = 0;
 var menuBusyKey = null;

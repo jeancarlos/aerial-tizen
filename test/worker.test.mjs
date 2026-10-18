@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Jean
+// SPDX-License-Identifier: MIT
 import assert from 'assert';
 import { makeHandler } from '../worker/index.mjs';
 

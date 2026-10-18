@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Jean
+// SPDX-License-Identifier: MIT
 var STILL_CLIP_MS = 8000;
 
 function simUseStills(protocol, search, proxy) {

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # Test: both deploy scripts say "Nothing installed. <reason>" whenever nothing was installed
 set -uo pipefail
 

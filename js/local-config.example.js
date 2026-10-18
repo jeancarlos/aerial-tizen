@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Jean
+// SPDX-License-Identifier: MIT
 // Copy to js/local-config.js (gitignored) and fill in.
 // deploy.sh packages local-config.js when it exists; without it the app uses
 // the public defaults and sends no telemetry.

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # Test: make-thumbs.sh writes where and how big each mode says it does
 set -euo pipefail
 

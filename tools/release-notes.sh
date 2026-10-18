@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # Prints the release notes of a tag: its CHANGELOG.md section and the upgrade impact. Fails without a section.
 set -euo pipefail
 

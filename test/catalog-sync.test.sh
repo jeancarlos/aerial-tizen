@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # Test: catalog.js and h264map.js must stay in sync and use http:// only
 set -euo pipefail
 

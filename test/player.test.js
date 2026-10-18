@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Jean
+// SPDX-License-Identifier: MIT
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');

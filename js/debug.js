@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Jean
+// SPDX-License-Identifier: MIT
 // On-screen debug board.
 //
 // The only sinks on this TV are this panel and an HTTP beacon: the restricted

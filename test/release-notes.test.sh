@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # Test: release notes are the tag's CHANGELOG section plus the upgrade impact, and a tag without one fails
 set -uo pipefail
 

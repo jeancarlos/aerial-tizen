@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Jean
+// SPDX-License-Identifier: MIT
 var LOCAL_SERVER = (typeof AERIAL_LOCAL_SERVER !== 'undefined') ? AERIAL_LOCAL_SERVER : '';
 
 var DEFAULT_SETTINGS = {

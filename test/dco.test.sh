@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # Test: check-dco.sh fails exactly the commits that need a sign-off
 set -euo pipefail
 

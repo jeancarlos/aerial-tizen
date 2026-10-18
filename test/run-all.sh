@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # Runs every suite. No network, no TV, no dependencies beyond node.
 set -uo pipefail
 
@@ -63,6 +65,10 @@ if bash "$DIR/release-notes.test.sh"; then :; else failed=1; fi
 echo
 echo "== reproducible release =="
 if bash "$DIR/reproducible.test.sh"; then :; else failed=1; fi
+
+echo
+echo "== licence headers =="
+if bash "$DIR/spdx.test.sh"; then :; else failed=1; fi
 
 echo
 echo "== demo =="

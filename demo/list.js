@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Jean
+// SPDX-License-Identifier: MIT
 function buildCatalogList(catalog, doc, onPlay) {
   var root = doc.createElement('div');
   var search = doc.createElement('input');

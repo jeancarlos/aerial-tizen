@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 # Fails when a commit in BASE..HEAD lacks a Signed-off-by line.
 #
 #   bash tools/check-dco.sh BASE HEAD

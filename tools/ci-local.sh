@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2026 Jean
+# SPDX-License-Identifier: MIT
 set -eu
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 cd "$(git rev-parse --show-toplevel)"
