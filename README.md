@@ -7,7 +7,7 @@
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/jeancarlos/aerial-tizen/badges/coverage.json)](https://github.com/jeancarlos/aerial-tizen/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/jeancarlos/aerial-tizen)](https://github.com/jeancarlos/aerial-tizen/releases/latest)
 [![Demo](https://img.shields.io/badge/demo-live-blue)](https://aerial.jeansouza.dev/)
-[![License: MIT](https://img.shields.io/github/license/jeancarlos/aerial-tizen)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![REUSE compliant](https://img.shields.io/badge/REUSE-compliant-green)](https://reuse.software/)
 [![Tizen 6.0+](https://img.shields.io/badge/Tizen-6.0%2B-1428a0)](#requirements)
 [![Dependencies: none](https://img.shields.io/badge/runtime%20dependencies-none-brightgreen)](package.json)
