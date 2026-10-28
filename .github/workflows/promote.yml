@@ -81,10 +81,6 @@ jobs:
             done
           }
 
-          version_at() {
-            git show "$1:package.json" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).version)'
-          }
-
           read_file_at() {
             local ref="$1" file="$2" destination="$3" response
             response="$(gh api "repos/$GH_REPO/contents/$file?ref=$ref")"
@@ -93,6 +89,23 @@ jobs:
               return 1
             }
             jq -r '.content | @base64d' <<< "$response" > "$destination"
+          }
+
+          version_at() {
+            local file version
+            file="$(mktemp "$RUNNER_TEMP/promotion-version.XXXXXX")"
+            read_file_at "$1" package.json "$file"
+            version="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).version)' "$file")"
+            rm -f "$file"
+            printf '%s' "$version"
+          }
+
+          single_parent_at() {
+            gh api "repos/$GH_REPO/commits/$1" --jq 'if (.parents | length) == 1 then .parents[0].sha else empty end'
+          }
+
+          changed_files_at() {
+            gh api "repos/$GH_REPO/commits/$1" --jq '.files[].filename' | LC_ALL=C sort
           }
 
           create_metadata_commit() {
@@ -149,7 +162,6 @@ jobs:
                 exit 0
               fi
             fi
-            git fetch origin "refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH"
           fi
 
           latest_sha="$(git ls-remote origin "refs/heads/$HEAD_BRANCH" | awk 'NR == 1 {print $1}')"
@@ -161,33 +173,38 @@ jobs:
 
             develop_sha="$(git ls-remote origin refs/heads/develop | awk 'NR == 1 {print $1}')"
             [ -n "$develop_sha" ] || { echo "develop branch is missing" >&2; exit 1; }
-            bump_parent="$(git rev-parse "$SHA^")"
+            bump_parent="$(single_parent_at "$SHA")"
             base_version="$(version_at "$develop_sha")"
             expected_version="$(next_patch "$base_version")"
             expected_branch="release-bump/v$expected_version-${develop_sha:0:7}"
             [ "$HEAD_BRANCH" = "$expected_branch" ] || { echo "unexpected version-bump branch" >&2; exit 1; }
-            if [ "$bump_parent" != "$develop_sha" ] || [ "$(git rev-list --count "$develop_sha..$SHA")" -ne 1 ]; then
+            if [ "$bump_parent" != "$develop_sha" ]; then
               echo "version-bump branch is not a single commit on current develop" >&2
               exit 1
             fi
             [ "$(version_at "$SHA")" = "$expected_version" ] || { echo "version bump is not the next patch" >&2; exit 1; }
 
             expected_files="$(printf '%s\n' CHANGELOG.md config.xml package-lock.json package.json)"
-            changed_files="$(git diff-tree --no-commit-id --name-only -r "$SHA" | LC_ALL=C sort)"
+            changed_files="$(changed_files_at "$SHA")"
             [ "$changed_files" = "$expected_files" ] || { echo "version-bump PR changes unexpected files" >&2; exit 1; }
-            release_dates="$(git show "$SHA:CHANGELOG.md" | sed -nE "s/^## $expected_version - ([0-9]{4}-[0-9]{2}-[0-9]{2})$/\\1/p")"
+            expected_dir="$(mktemp -d "$RUNNER_TEMP/release-bump-expected.XXXXXX")"
+            mkdir "$expected_dir/source"
+            for file in CHANGELOG.md config.xml package-lock.json package.json; do
+              read_file_at "$SHA" "$file" "$expected_dir/source/$file"
+            done
+            release_dates="$(sed -nE "s/^## $expected_version - ([0-9]{4}-[0-9]{2}-[0-9]{2})$/\\1/p" "$expected_dir/source/CHANGELOG.md")"
             [ "$(printf '%s\n' "$release_dates" | wc -l)" -eq 1 ] && [[ "$release_dates" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
+              rm -rf "$expected_dir"
               echo "version-bump changelog has no unique release date" >&2
               exit 1
             }
             release_date="$release_dates"
-            expected_dir="$(mktemp -d "$RUNNER_TEMP/release-bump-expected.XXXXXX")"
             for file in config.xml package.json package-lock.json CHANGELOG.md; do
               read_file_at "$develop_sha" "$file" "$expected_dir/$file"
             done
             node "$RUNNER_TEMP/prepare-promotion-release.js" "$expected_dir" "$release_date"
             for file in CHANGELOG.md config.xml package-lock.json package.json; do
-              if ! git show "$SHA:$file" | cmp -s - "$expected_dir/$file"; then
+              if ! cmp -s "$expected_dir/source/$file" "$expected_dir/$file"; then
                 rm -rf "$expected_dir"
                 echo "version-bump PR does not match generated release metadata" >&2
                 exit 1
@@ -212,26 +229,28 @@ jobs:
             develop_sha="$(git ls-remote origin refs/heads/develop | awk 'NR == 1 {print $1}')"
             [ -n "$develop_sha" ] || { echo "develop branch is missing" >&2; exit 1; }
             version="$(version_at "$develop_sha")"
-            main_version="$(version_at origin/main)"
+            main_version="$(version_at main)"
             expected_version="$(next_patch "$main_version")"
             refresh_branch="release-notes/v$version"
             [ "$version" = "$expected_version" ] && [ "$HEAD_BRANCH" = "$refresh_branch" ] || {
               echo "release-note refresh is not for the current next patch" >&2
               exit 1
             }
-            bump_parent="$(git rev-parse "$SHA^")"
-            if [ "$bump_parent" != "$develop_sha" ] || [ "$(git rev-list --count "$develop_sha..$SHA")" -ne 1 ]; then
+            bump_parent="$(single_parent_at "$SHA")"
+            if [ "$bump_parent" != "$develop_sha" ]; then
               echo "release-note refresh is not a single commit on current develop" >&2
               exit 1
             fi
 
-            changed_files="$(git diff-tree --no-commit-id --name-only -r "$SHA" | LC_ALL=C sort)"
+            changed_files="$(changed_files_at "$SHA")"
             [ "$changed_files" = CHANGELOG.md ] || { echo "release-note refresh changes unexpected files" >&2; exit 1; }
             expected_dir="$(mktemp -d "$RUNNER_TEMP/release-notes-expected.XXXXXX")"
+            mkdir "$expected_dir/source"
             read_file_at "$develop_sha" package.json "$expected_dir/package.json"
             read_file_at "$develop_sha" CHANGELOG.md "$expected_dir/CHANGELOG.md"
+            read_file_at "$SHA" CHANGELOG.md "$expected_dir/source/CHANGELOG.md"
             node "$RUNNER_TEMP/refresh-promotion-changelog.js" "$expected_dir"
-            if ! git show "$SHA:CHANGELOG.md" | cmp -s - "$expected_dir/CHANGELOG.md"; then
+            if ! cmp -s "$expected_dir/source/CHANGELOG.md" "$expected_dir/CHANGELOG.md"; then
               rm -rf "$expected_dir"
               echo "release-note refresh does not match current develop" >&2
               exit 1
@@ -251,7 +270,7 @@ jobs:
           ahead_by="$(gh api "repos/$GH_REPO/compare/main...$SHA" --jq .ahead_by)"
           if [ "$ahead_by" -eq 0 ]; then echo "main is up to date"; exit 0; fi
 
-          main_version="$(version_at origin/main)"
+          main_version="$(version_at main)"
           develop_version="$(version_at "$SHA")"
           if [ "$develop_version" = "$main_version" ]; then
             if [ "$EVENT" = push ]; then
@@ -274,11 +293,8 @@ jobs:
               git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $git_auth" push origin "$bump_sha:refs/heads/$bump_branch"
               unset git_auth
               rm -rf "$bump_dir"
-            else
-              git fetch origin "refs/heads/$bump_branch:refs/remotes/origin/$bump_branch"
-              bump_sha="$(git rev-parse "refs/remotes/origin/$bump_branch")"
             fi
-            if [ "$(git rev-parse "$bump_sha^")" != "$SHA" ] || [ "$(git rev-list --count "$SHA..$bump_sha")" -ne 1 ]; then
+            if [ "$(single_parent_at "$bump_sha")" != "$SHA" ]; then
               echo "release-bump branch does not contain exactly one commit on $SHA" >&2
               exit 1
             fi
@@ -314,8 +330,10 @@ jobs:
           expected_dir="$(mktemp -d "$RUNNER_TEMP/release-notes-expected.XXXXXX")"
           read_file_at "$SHA" package.json "$expected_dir/package.json"
           read_file_at "$SHA" CHANGELOG.md "$expected_dir/CHANGELOG.md"
+          mkdir "$expected_dir/source"
+          cp "$expected_dir/CHANGELOG.md" "$expected_dir/source/CHANGELOG.md"
           node "$RUNNER_TEMP/refresh-promotion-changelog.js" "$expected_dir"
-          if ! git show "$SHA:CHANGELOG.md" | cmp -s - "$expected_dir/CHANGELOG.md"; then
+          if ! cmp -s "$expected_dir/source/CHANGELOG.md" "$expected_dir/CHANGELOG.md"; then
             refresh_branch="release-notes/v$develop_version"
             refresh_sha="$(create_metadata_commit "$SHA" "$expected_dir" "chore: update v$develop_version release notes" CHANGELOG.md)"
             git_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"

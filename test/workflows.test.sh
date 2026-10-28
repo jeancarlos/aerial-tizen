@@ -24,10 +24,10 @@ check "promotion helper dispatches missing DCO" has_tool merge-promotion-pr.sh '
 check "release continuation requires DCO on the merged head" has promote.yml 'select(.name == "dco" and .conclusion == "success")'
 check "promote computes numeric patch versions" has promote.yml 'match(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/)'
 check "promote derives the bump branch from the verified develop head" has promote.yml 'bump_branch="release-bump/v$next_version-${SHA:0:7}"'
-check "promote fetches open release-bump commits before validating them" has promote.yml 'git fetch origin "refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH"'
-check "promote recovers merged bump PRs before fetching deleted branches" awk 'index($0, "if [ \"$pr_state\" = MERGED ]") { merged = NR } index($0, "git fetch origin \"refs/heads/$HEAD_BRANCH") { fetch = NR } END { exit !(merged && fetch && merged < fetch) }' "$ROOT/.github/workflows/promote.yml"
-check "promote validates a bump branch against its develop parent" has promote.yml 'bump_parent="$(git rev-parse "$SHA^")"'
-check "promote requires one bump commit directly on current develop" has promote.yml 'if [ "$bump_parent" != "$develop_sha" ] || [ "$(git rev-list --count "$develop_sha..$SHA")" -ne 1 ]; then'
+check "promote validates open release-bump commits through the GitHub API" bash -c "grep -qF 'single_parent_at \"\$SHA\"' '$ROOT/.github/workflows/promote.yml' && grep -qF 'changed_files_at \"\$SHA\"' '$ROOT/.github/workflows/promote.yml'"
+check "promote recovers merged bump PRs without fetching deleted branches" bash -c "! grep -qF 'git fetch origin \"refs/heads/\$HEAD_BRANCH' '$ROOT/.github/workflows/promote.yml'"
+check "promote validates a bump branch against its develop parent" has promote.yml 'bump_parent="$(single_parent_at "$SHA")"'
+check "promote requires one bump commit directly on current develop" has promote.yml 'if [ "$bump_parent" != "$develop_sha" ]; then'
 check "promote resumes develop checks after the bump PR merges" has promote.yml 'ensure_develop_checks "$develop_sha" "$main_sha"'
 check "promote restricts bump PR changes to release metadata" has promote.yml 'expected_files="$(printf '\''%s\n'\'' CHANGELOG.md config.xml package-lock.json package.json)"'
 check "promote verifies the generated bump with the release helper" has promote.yml 'node "$RUNNER_TEMP/prepare-promotion-release.js" "$expected_dir" "$release_date"'
@@ -71,6 +71,7 @@ check "promote release verifies the merged PR and its code-owner approval" bash 
 check "promotion review lookup paginates and ignores comments" bash -c "grep -qF -- '--paginate --slurp' '$ROOT/tools/merge-promotion-pr.sh' && grep -qF 'state != \"COMMENTED\"' '$ROOT/tools/merge-promotion-pr.sh' && grep -qF -- '--paginate --slurp' '$ROOT/.github/workflows/promote.yml' && grep -qF 'state != \"COMMENTED\"' '$ROOT/.github/workflows/promote.yml'"
 check "promote release tags the recorded merge commit" has promote.yml 'ref="refs/tags/$tag" -f sha="$merge_sha"'
 check "promotion creates metadata commits without checking out workflow SHAs" bash -c "! grep -qF 'git checkout' '$ROOT/.github/workflows/promote.yml'"
+check "promotion fetches only trusted branches" bash -c "grep -qF 'git fetch origin main develop' '$ROOT/.github/workflows/promote.yml' && ! grep -qF 'git fetch origin \"refs/heads/' '$ROOT/.github/workflows/promote.yml'"
 check "release continuation reads merge metadata through the Contents API" bash -c "grep -qF 'contents/\$file?ref=\$ref' '$ROOT/.github/workflows/promote.yml' && grep -qF 'read_file_at \"\$MERGE_SHA\" config.xml' '$ROOT/.github/workflows/promote.yml'"
 check "release continuation avoids checkout at the dispatch-provided SHA" bash -c "! grep -qF 'ref: \${{ inputs.merge_sha }}' '$ROOT/.github/workflows/promote.yml'"
 check "promote validates release metadata as data from the merge commit" has promote.yml 'const config = fs.readFileSync(process.argv[1], "utf8")'
