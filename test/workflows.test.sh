@@ -70,7 +70,10 @@ check "promote repairs develop checks when the bump PR already merged" has promo
 check "promote release verifies the merged PR and its code-owner approval" bash -c "grep -qF 'PR_NUMBER: \${{ inputs.pull_request }}' '$ROOT/.github/workflows/promote.yml' && grep -qF 'CODEOWNER_LOGIN: jeancarlos' '$ROOT/.github/workflows/promote.yml' && grep -qF 'pulls/\$PR_NUMBER/reviews' '$ROOT/.github/workflows/promote.yml' && grep -qF 'HEAD_SHA=' '$ROOT/.github/workflows/promote.yml' && grep -qF 'headRefOid' '$ROOT/.github/workflows/promote.yml'"
 check "promotion review lookup paginates and ignores comments" bash -c "grep -qF -- '--paginate --slurp' '$ROOT/tools/merge-promotion-pr.sh' && grep -qF 'state != \"COMMENTED\"' '$ROOT/tools/merge-promotion-pr.sh' && grep -qF -- '--paginate --slurp' '$ROOT/.github/workflows/promote.yml' && grep -qF 'state != \"COMMENTED\"' '$ROOT/.github/workflows/promote.yml'"
 check "promote release tags the recorded merge commit" has promote.yml 'ref="refs/tags/$tag" -f sha="$merge_sha"'
-check "promote validates release metadata as data from the merge commit" has promote.yml 'const config = fs.readFileSync("config.xml", "utf8")'
+check "promotion creates metadata commits without checking out workflow SHAs" bash -c "! grep -qF 'git checkout' '$ROOT/.github/workflows/promote.yml'"
+check "release continuation reads merge metadata through the Contents API" bash -c "grep -qF 'contents/\$file?ref=\$ref' '$ROOT/.github/workflows/promote.yml' && grep -qF 'read_file_at \"\$MERGE_SHA\" config.xml' '$ROOT/.github/workflows/promote.yml'"
+check "release continuation avoids checkout at the dispatch-provided SHA" bash -c "! grep -qF 'ref: \${{ inputs.merge_sha }}' '$ROOT/.github/workflows/promote.yml'"
+check "promote validates release metadata as data from the merge commit" has promote.yml 'const config = fs.readFileSync(process.argv[1], "utf8")'
 check "promote release does not execute scripts from the merged commit" bash -c "! grep -q 'bash tools/check-version.sh' '$ROOT/.github/workflows/promote.yml'"
 check "promote dispatches release on the version tag" has promote.yml 'gh workflow run release.yml --ref "$tag" --repo "$GH_REPO"'
 check "promote release retry runs even when main already contains develop" has promote.yml 'name: publish promotion release'

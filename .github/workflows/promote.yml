@@ -85,6 +85,28 @@ jobs:
             git show "$1:package.json" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).version)'
           }
 
+          read_file_at() {
+            local ref="$1" file="$2" destination="$3" response
+            response="$(gh api "repos/$GH_REPO/contents/$file?ref=$ref")"
+            [ "$(jq -r .type <<< "$response")" = file ] && [ "$(jq -r .encoding <<< "$response")" = base64 ] || {
+              echo "$file at $ref is not a regular text file" >&2
+              return 1
+            }
+            jq -r '.content | @base64d' <<< "$response" > "$destination"
+          }
+
+          create_metadata_commit() {
+            local parent="$1" root="$2" message="$3" index tree commit
+            shift 3
+            index="$(mktemp "$RUNNER_TEMP/promotion-index.XXXXXX")"
+            GIT_INDEX_FILE="$index" git read-tree "$parent"
+            GIT_INDEX_FILE="$index" git --work-tree="$root" add -- "$@"
+            tree="$(GIT_INDEX_FILE="$index" git write-tree)"
+            commit="$(printf '%s\n\nSigned-off-by: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>\n' "$message" | GIT_AUTHOR_NAME='github-actions[bot]' GIT_AUTHOR_EMAIL='41898282+github-actions[bot]@users.noreply.github.com' GIT_COMMITTER_NAME='github-actions[bot]' GIT_COMMITTER_EMAIL='41898282+github-actions[bot]@users.noreply.github.com' git commit-tree "$tree" -p "$parent")"
+            rm -f "$index"
+            printf '%s' "$commit"
+          }
+
           next_patch() {
             node -e 'const match = process.argv[1].match(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/); if (!match) process.exit(1); console.log(match[1] + "." + match[2] + "." + (BigInt(match[3]) + 1n))' "$1"
           }
@@ -160,9 +182,9 @@ jobs:
             }
             release_date="$release_dates"
             expected_dir="$(mktemp -d "$RUNNER_TEMP/release-bump-expected.XXXXXX")"
-            git archive "$develop_sha" | tar -x -C "$expected_dir"
-            mkdir -p "$expected_dir/tools"
-            cp "$RUNNER_TEMP/prepare-promotion-release.js" "$expected_dir/tools/prepare-promotion-release.js"
+            for file in config.xml package.json package-lock.json CHANGELOG.md; do
+              read_file_at "$develop_sha" "$file" "$expected_dir/$file"
+            done
             node "$RUNNER_TEMP/prepare-promotion-release.js" "$expected_dir" "$release_date"
             for file in CHANGELOG.md config.xml package-lock.json package.json; do
               if ! git show "$SHA:$file" | cmp -s - "$expected_dir/$file"; then
@@ -206,7 +228,8 @@ jobs:
             changed_files="$(git diff-tree --no-commit-id --name-only -r "$SHA" | LC_ALL=C sort)"
             [ "$changed_files" = CHANGELOG.md ] || { echo "release-note refresh changes unexpected files" >&2; exit 1; }
             expected_dir="$(mktemp -d "$RUNNER_TEMP/release-notes-expected.XXXXXX")"
-            git archive "$develop_sha" | tar -x -C "$expected_dir"
+            read_file_at "$develop_sha" package.json "$expected_dir/package.json"
+            read_file_at "$develop_sha" CHANGELOG.md "$expected_dir/CHANGELOG.md"
             node "$RUNNER_TEMP/refresh-promotion-changelog.js" "$expected_dir"
             if ! git show "$SHA:CHANGELOG.md" | cmp -s - "$expected_dir/CHANGELOG.md"; then
               rm -rf "$expected_dir"
@@ -241,16 +264,16 @@ jobs:
             bump_branch="release-bump/v$next_version-${SHA:0:7}"
             bump_sha="$(git ls-remote origin "refs/heads/$bump_branch" | awk 'NR == 1 {print $1}')"
             if [ -z "$bump_sha" ]; then
-              git checkout -b "$bump_branch" "$SHA"
-              node "$RUNNER_TEMP/prepare-promotion-release.js" "$GITHUB_WORKSPACE" "$(date -u +%Y-%m-%d)"
-              git config user.name "github-actions[bot]"
-              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-              git add config.xml package.json package-lock.json CHANGELOG.md
-              git commit -s -m "chore: prepare v$next_version release"
+              bump_dir="$(mktemp -d "$RUNNER_TEMP/release-bump.XXXXXX")"
+              for file in config.xml package.json package-lock.json CHANGELOG.md; do
+                read_file_at "$SHA" "$file" "$bump_dir/$file"
+              done
+              node "$RUNNER_TEMP/prepare-promotion-release.js" "$bump_dir" "$(date -u +%Y-%m-%d)"
+              bump_sha="$(create_metadata_commit "$SHA" "$bump_dir" "chore: prepare v$next_version release" config.xml package.json package-lock.json CHANGELOG.md)"
               git_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-              git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $git_auth" push origin "$bump_branch"
+              git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $git_auth" push origin "$bump_sha:refs/heads/$bump_branch"
               unset git_auth
-              bump_sha="$(git rev-parse HEAD)"
+              rm -rf "$bump_dir"
             else
               git fetch origin "refs/heads/$bump_branch:refs/remotes/origin/$bump_branch"
               bump_sha="$(git rev-parse "refs/remotes/origin/$bump_branch")"
@@ -289,18 +312,14 @@ jobs:
           fi
 
           expected_dir="$(mktemp -d "$RUNNER_TEMP/release-notes-expected.XXXXXX")"
-          git archive "$SHA" | tar -x -C "$expected_dir"
+          read_file_at "$SHA" package.json "$expected_dir/package.json"
+          read_file_at "$SHA" CHANGELOG.md "$expected_dir/CHANGELOG.md"
           node "$RUNNER_TEMP/refresh-promotion-changelog.js" "$expected_dir"
           if ! git show "$SHA:CHANGELOG.md" | cmp -s - "$expected_dir/CHANGELOG.md"; then
             refresh_branch="release-notes/v$develop_version"
-            git checkout -B "$refresh_branch" "$SHA"
-            cp "$expected_dir/CHANGELOG.md" "$GITHUB_WORKSPACE/CHANGELOG.md"
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add CHANGELOG.md
-            git commit -s -m "chore: update v$develop_version release notes"
+            refresh_sha="$(create_metadata_commit "$SHA" "$expected_dir" "chore: update v$develop_version release notes" CHANGELOG.md)"
             git_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-            git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $git_auth" push --force origin "$refresh_branch"
+            git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $git_auth" push --force origin "$refresh_sha:refs/heads/$refresh_branch"
             unset git_auth
             rm -rf "$expected_dir"
 
@@ -314,8 +333,6 @@ jobs:
               gh pr create --base develop --head "$refresh_branch" --title "Release: update v$develop_version notes" --body "Move notes added to Unreleased into the pending v$develop_version release. Required checks run before this metadata PR is merged."
             fi
 
-            refresh_sha="$(git ls-remote origin "refs/heads/$refresh_branch" | awk 'NR == 1 {print $1}')"
-            [[ "$refresh_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid release-note refresh SHA" >&2; exit 1; }
             ensure_workflow_run ci.yml "$refresh_sha" "$refresh_branch" "" workflow_dispatch
             ensure_workflow_run security.yml "$refresh_sha" "$refresh_branch" "" workflow_dispatch
             ensure_workflow_run dco.yml "$refresh_sha" "$refresh_branch" "$SHA" workflow_dispatch
@@ -369,7 +386,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.merge_sha }}
+          ref: main
           fetch-depth: 1
           persist-credentials: false
       - name: tag and dispatch the signed release
@@ -384,6 +401,20 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ && "$MERGE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid promotion reference" >&2; exit 1; }
+          METADATA_DIR="$(mktemp -d "$RUNNER_TEMP/release-metadata.XXXXXX")"
+          trap 'rm -rf "$METADATA_DIR"' EXIT
+          read_file_at() {
+            local ref="$1" file="$2" destination="$3" response
+            response="$(gh api "repos/$GH_REPO/contents/$file?ref=$ref")"
+            [ "$(jq -r .type <<< "$response")" = file ] && [ "$(jq -r .encoding <<< "$response")" = base64 ] || {
+              echo "$file at $ref is not a regular text file" >&2
+              return 1
+            }
+            jq -r '.content | @base64d' <<< "$response" > "$destination"
+          }
+          read_file_at "$MERGE_SHA" config.xml "$METADATA_DIR/config.xml"
+          read_file_at "$MERGE_SHA" package.json "$METADATA_DIR/package.json"
+          read_file_at "$MERGE_SHA" package-lock.json "$METADATA_DIR/package-lock.json"
           pr_data="$(gh pr view "$PR_NUMBER" --repo "$GH_REPO" --json state,baseRefName,headRefName,headRefOid,mergeCommit --jq '{state,baseRefName,headRefName,headRefOid,mergeSha:.mergeCommit.oid}')"
           [ "$(jq -r .state <<< "$pr_data")" = MERGED ] || { echo "promotion PR #$PR_NUMBER is not merged" >&2; exit 1; }
           [ "$(jq -r .baseRefName <<< "$pr_data")" = main ] && [ "$(jq -r .headRefName <<< "$pr_data")" = develop ] || { echo "PR #$PR_NUMBER is not develop to main" >&2; exit 1; }
@@ -437,14 +468,14 @@ jobs:
           fi
           version="$(node -e '
           const fs = require("fs");
-          const config = fs.readFileSync("config.xml", "utf8");
+          const config = fs.readFileSync(process.argv[1], "utf8");
           const widget = config.match(/<widget\b[^>]*\bversion="([^"]+)"/);
-          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-          const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+          const pkg = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const lock = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
           const versions = [widget && widget[1], pkg.version, lock.version, lock.packages && lock.packages[""] && lock.packages[""].version];
           if (versions.some(version => !version) || !versions.every(version => version === versions[0]) || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(versions[0])) process.exit(1);
           process.stdout.write(versions[0]);
-          ')"
+          ' "$METADATA_DIR/config.xml" "$METADATA_DIR/package.json" "$METADATA_DIR/package-lock.json")"
           tag="v$version"
           merge_sha="$MERGE_SHA"
           tag_exists=false
