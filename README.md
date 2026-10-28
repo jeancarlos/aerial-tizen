@@ -9,7 +9,7 @@
 [![Demo](https://img.shields.io/badge/demo-live-blue)](https://aerial.jeansouza.dev/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![REUSE compliant](https://img.shields.io/badge/REUSE-compliant-green)](https://reuse.software/)
-[![Tizen 6.0+](https://img.shields.io/badge/Tizen-6.0%2B-1428a0)](#requirements)
+[![Tizen 5.5+](https://img.shields.io/badge/Tizen-5.5%2B-1428a0)](#requirements)
 [![Dependencies: none](https://img.shields.io/badge/runtime%20dependencies-none-brightgreen)](package.json)
 
 Apple TV's aerial screensavers, running natively on a Samsung TV. 115 videos streamed from Apple's CDN and decoded in hardware as HEVC 4K through Samsung's AVPlay.
@@ -29,7 +29,7 @@ Each video fades into the next and shows its title and description while it load
 
 ## Requirements
 
-- A Samsung Smart TV on Tizen 6.0 or newer, which means a 2021 model or later.
+- A Samsung Smart TV on Tizen 5.5 or newer, which means a 2020 model or later.
 - A PC on the same network segment as the TV.
 - Either Docker, or the [Tizen Studio CLI](https://developer.tizen.org/development/tizen-studio/download).
 

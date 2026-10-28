@@ -291,7 +291,7 @@ function tryPlay(s) {
     stopAndClose();
     avplay.open(s.urls[s.urlIndex]);
     avplay.setDisplayRect(0, 0, 1920, 1080);
-    try { avplay.setStreamingProperty('SET_MODE_4K', 'TRUE'); } catch (e) {}
+    try { avplay.setStreamingProperty('ADAPTIVE_INFO', 'FIXED_MAX_RESOLUTION=3840X2160'); } catch (e) {}
     avplay.setListener(playbackListener(run));
     armWatchdog(run);
     avplay.prepareAsync(function () {
