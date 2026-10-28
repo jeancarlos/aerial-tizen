@@ -5,9 +5,6 @@ on:
   workflow_run:
     workflows: [ci, security, dco]
     types: [completed]
-    branches:
-      - develop
-      - "release-bump/**"
   workflow_dispatch:
     inputs:
       pull_request:
@@ -18,6 +15,14 @@ on:
         description: Verified pull request merge commit
         required: true
         type: string
+      released_tag:
+        description: Stable release that completed before this queued promotion
+        required: false
+        type: string
+      source_pull_request:
+        description: Merged develop PR that supplied the first promotion during workflow bootstrap
+        required: false
+        type: number
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [main]
@@ -25,7 +30,7 @@ on:
     types: [submitted, edited, dismissed]
 permissions: {}
 concurrency:
-  group: promote-${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref || inputs.merge_sha || github.ref_name }}
+  group: promote-${{ github.event.workflow_run.head_branch == 'main' && format('main-{0}-{1}', github.event.workflow_run.name, github.event.workflow_run.head_sha) || github.event.workflow_run.head_branch && format('branch-{0}', github.event.workflow_run.head_branch) || github.event.pull_request.number && format('pr-{0}-{1}', github.event.pull_request.number, github.event.pull_request.head.sha) || inputs.merge_sha || github.ref_name }}
   cancel-in-progress: false
 jobs:
   promote:
@@ -50,18 +55,22 @@ jobs:
           SHA: ${{ github.event.workflow_run.head_sha }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           EVENT: ${{ github.event.workflow_run.event }}
+          WORKFLOW: ${{ github.event.workflow_run.name }}
         run: |
           set -euo pipefail
           [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid workflow head SHA"; exit 1; }
-          [[ "$HEAD_BRANCH" == develop || "$HEAD_BRANCH" == release-bump/* ]] || exit 0
+          [[ "$HEAD_BRANCH" == main || "$HEAD_BRANCH" == develop || "$HEAD_BRANCH" == release-bump/* || "$HEAD_BRANCH" == release-notes/* ]] || exit 0
           git fetch origin main develop
-          if [[ "$HEAD_BRANCH" == release-bump/* ]]; then
-            git fetch origin "refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH"
-          fi
           cp tools/prepare-promotion-release.js "$RUNNER_TEMP/prepare-promotion-release.js"
+          cp tools/refresh-promotion-changelog.js "$RUNNER_TEMP/refresh-promotion-changelog.js"
 
-          latest_sha="$(git ls-remote origin "refs/heads/$HEAD_BRANCH" | awk 'NR == 1 {print $1}')"
-          if [ "$latest_sha" != "$SHA" ]; then echo "branch moved, a newer workflow run will continue"; exit 0; fi
+          if [[ "$HEAD_BRANCH" == main ]]; then
+            [ "$EVENT" = push ] && [ "$WORKFLOW" = ci ] || exit 0
+            pr="$(gh api "repos/$GH_REPO/commits/$SHA/pulls" --jq "[.[] | select(.base.ref == \"main\" and .head.ref == \"develop\" and .merge_commit_sha == \"$SHA\" and .merged_at != null)] | last | .number // empty")"
+            if [ -z "$pr" ]; then echo "main commit $SHA is not a merged develop promotion"; exit 0; fi
+            gh workflow run promote.yml --ref main --repo "$GH_REPO" --field pull_request="$pr" --field merge_sha="$SHA"
+            exit 0
+          fi
 
           check_required() {
             local sha="$1" name count
@@ -80,26 +89,53 @@ jobs:
             node -e 'const match = process.argv[1].match(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/); if (!match) process.exit(1); console.log(match[1] + "." + match[2] + "." + (BigInt(match[3]) + 1n))' "$1"
           }
 
-          dispatch_develop_checks() {
-            local base="$1"
-            gh workflow run ci.yml --ref develop --repo "$GH_REPO"
-            gh workflow run security.yml --ref develop --repo "$GH_REPO"
-            gh workflow run dco.yml --ref develop --repo "$GH_REPO" --field base="$base"
+          ensure_workflow_run() {
+            local workflow="$1" sha="$2" ref="$3" base="$4" event="$5" count
+            local -a args=(--workflow "$workflow" --commit "$sha" --repo "$GH_REPO" --limit 100 --json databaseId --jq length)
+            if [ -n "$event" ]; then args+=(--event "$event"); fi
+            count="$(gh run list "${args[@]}")"
+            if [ "$count" -gt 0 ]; then return 0; fi
+            if [ -n "$base" ]; then
+              gh workflow run "$workflow" --ref "$ref" --repo "$GH_REPO" --field base="$base"
+            else
+              gh workflow run "$workflow" --ref "$ref" --repo "$GH_REPO"
+            fi
           }
+
+          ensure_develop_checks() {
+            local sha="$1" base="$2"
+            ensure_workflow_run ci.yml "$sha" develop "" ""
+            ensure_workflow_run security.yml "$sha" develop "" ""
+            ensure_workflow_run dco.yml "$sha" develop "$base" ""
+          }
+
+          if [[ "$HEAD_BRANCH" == release-bump/* || "$HEAD_BRANCH" == release-notes/* ]]; then
+            [ "$EVENT" = workflow_dispatch ] || exit 0
+            pr="$(gh pr list --state open --base develop --head "$HEAD_BRANCH" --json number --jq '.[0].number')"
+            if [ -z "$pr" ]; then
+              pr_state="$(gh pr list --state all --base develop --head "$HEAD_BRANCH" --json state --jq '.[0].state // empty')"
+              if [ "$pr_state" = MERGED ]; then
+                develop_sha="$(git ls-remote origin refs/heads/develop | awk 'NR == 1 {print $1}')"
+                main_sha="$(git ls-remote origin refs/heads/main | awk 'NR == 1 {print $1}')"
+                [ -n "$develop_sha" ] && [ -n "$main_sha" ] || { echo "develop or main branch is missing" >&2; exit 1; }
+                ensure_develop_checks "$develop_sha" "$main_sha"
+                echo "develop checks reconciled after merged version-bump PR"
+                exit 0
+              fi
+              if [ "$pr_state" = CLOSED ]; then
+                echo "version-bump PR was closed without merging"
+                exit 0
+              fi
+            fi
+            git fetch origin "refs/heads/$HEAD_BRANCH:refs/remotes/origin/$HEAD_BRANCH"
+          fi
+
+          latest_sha="$(git ls-remote origin "refs/heads/$HEAD_BRANCH" | awk 'NR == 1 {print $1}')"
+          if [[ "$HEAD_BRANCH" != main ]] && [ "$latest_sha" != "$SHA" ]; then echo "branch moved, a newer workflow run will continue"; exit 0; fi
 
           if [[ "$HEAD_BRANCH" == release-bump/* ]]; then
             [ "$EVENT" = workflow_dispatch ] || exit 0
             if ! check_required "$SHA" test reuse zizmor dco; then exit 0; fi
-            pr="$(gh pr list --state open --base develop --head "$HEAD_BRANCH" --json number --jq '.[0].number')"
-            if [ -z "$pr" ]; then
-              pr_state="$(gh pr list --state all --base develop --head "$HEAD_BRANCH" --json state --jq '.[0].state // empty')"
-              if [ "$pr_state" = MERGED ] || [ "$pr_state" = CLOSED ]; then
-                echo "version-bump PR is already closed or merged"
-                exit 0
-              fi
-              echo "version-bump PR is missing" >&2
-              exit 1
-            fi
 
             develop_sha="$(git ls-remote origin refs/heads/develop | awk 'NR == 1 {print $1}')"
             [ -n "$develop_sha" ] || { echo "develop branch is missing" >&2; exit 1; }
@@ -137,9 +173,55 @@ jobs:
             done
             rm -rf "$expected_dir"
 
-            gh pr merge "$pr" --merge --match-head-commit "$SHA"
-            main_sha="$(git ls-remote origin refs/heads/main | awk 'NR == 1 {print $1}')"
-            dispatch_develop_checks "$main_sha"
+            if [ -n "$pr" ]; then
+              gh pr merge "$pr" --merge --match-head-commit "$SHA"
+              main_sha="$(git ls-remote origin refs/heads/main | awk 'NR == 1 {print $1}')"
+              develop_sha="$(git ls-remote origin refs/heads/develop | awk 'NR == 1 {print $1}')"
+              [ -n "$develop_sha" ] && [ -n "$main_sha" ] || { echo "develop or main branch is missing" >&2; exit 1; }
+              ensure_develop_checks "$develop_sha" "$main_sha"
+            fi
+            exit 0
+          fi
+
+          if [[ "$HEAD_BRANCH" == release-notes/* ]]; then
+            [ "$EVENT" = workflow_dispatch ] || exit 0
+            if ! check_required "$SHA" test reuse zizmor dco; then exit 0; fi
+
+            develop_sha="$(git ls-remote origin refs/heads/develop | awk 'NR == 1 {print $1}')"
+            [ -n "$develop_sha" ] || { echo "develop branch is missing" >&2; exit 1; }
+            version="$(version_at "$develop_sha")"
+            main_version="$(version_at origin/main)"
+            expected_version="$(next_patch "$main_version")"
+            refresh_branch="release-notes/v$version"
+            [ "$version" = "$expected_version" ] && [ "$HEAD_BRANCH" = "$refresh_branch" ] || {
+              echo "release-note refresh is not for the current next patch" >&2
+              exit 1
+            }
+            bump_parent="$(git rev-parse "$SHA^")"
+            if [ "$bump_parent" != "$develop_sha" ] || [ "$(git rev-list --count "$develop_sha..$SHA")" -ne 1 ]; then
+              echo "release-note refresh is not a single commit on current develop" >&2
+              exit 1
+            fi
+
+            changed_files="$(git diff-tree --no-commit-id --name-only -r "$SHA" | LC_ALL=C sort)"
+            [ "$changed_files" = CHANGELOG.md ] || { echo "release-note refresh changes unexpected files" >&2; exit 1; }
+            expected_dir="$(mktemp -d "$RUNNER_TEMP/release-notes-expected.XXXXXX")"
+            git archive "$develop_sha" | tar -x -C "$expected_dir"
+            node "$RUNNER_TEMP/refresh-promotion-changelog.js" "$expected_dir"
+            if ! git show "$SHA:CHANGELOG.md" | cmp -s - "$expected_dir/CHANGELOG.md"; then
+              rm -rf "$expected_dir"
+              echo "release-note refresh does not match current develop" >&2
+              exit 1
+            fi
+            rm -rf "$expected_dir"
+
+            if [ -n "$pr" ]; then
+              gh pr merge "$pr" --merge --match-head-commit "$SHA"
+              main_sha="$(git ls-remote origin refs/heads/main | awk 'NR == 1 {print $1}')"
+              develop_sha="$(git ls-remote origin refs/heads/develop | awk 'NR == 1 {print $1}')"
+              [ -n "$develop_sha" ] && [ -n "$main_sha" ] || { echo "develop or main branch is missing" >&2; exit 1; }
+              ensure_develop_checks "$develop_sha" "$main_sha"
+            fi
             exit 0
           fi
 
@@ -157,26 +239,40 @@ jobs:
 
             next_version="$(next_patch "$main_version")"
             bump_branch="release-bump/v$next_version-${SHA:0:7}"
-            existing_pr="$(gh pr list --state open --base develop --head "$bump_branch" --json number --jq '.[0].number')"
-            if [ -n "$existing_pr" ]; then echo "version-bump PR #$existing_pr is already open"; exit 0; fi
-            if git ls-remote --exit-code --heads origin "$bump_branch" >/dev/null 2>&1; then
-              echo "release-bump branch exists without an open PR" >&2
+            bump_sha="$(git ls-remote origin "refs/heads/$bump_branch" | awk 'NR == 1 {print $1}')"
+            if [ -z "$bump_sha" ]; then
+              git checkout -b "$bump_branch" "$SHA"
+              node "$RUNNER_TEMP/prepare-promotion-release.js" "$GITHUB_WORKSPACE" "$(date -u +%Y-%m-%d)"
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git add config.xml package.json package-lock.json CHANGELOG.md
+              git commit -s -m "chore: prepare v$next_version release"
+              git_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+              git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $git_auth" push origin "$bump_branch"
+              unset git_auth
+              bump_sha="$(git rev-parse HEAD)"
+            else
+              git fetch origin "refs/heads/$bump_branch:refs/remotes/origin/$bump_branch"
+              bump_sha="$(git rev-parse "refs/remotes/origin/$bump_branch")"
+            fi
+            if [ "$(git rev-parse "$bump_sha^")" != "$SHA" ] || [ "$(git rev-list --count "$SHA..$bump_sha")" -ne 1 ]; then
+              echo "release-bump branch does not contain exactly one commit on $SHA" >&2
               exit 1
             fi
 
-            git checkout -b "$bump_branch" "$SHA"
-            node "$RUNNER_TEMP/prepare-promotion-release.js" "$GITHUB_WORKSPACE" "$(date -u +%Y-%m-%d)"
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add config.xml package.json package-lock.json CHANGELOG.md
-            git commit -s -m "chore: prepare v$next_version release"
-            git_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-            git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $git_auth" push origin "$bump_branch"
-            unset git_auth
-            gh pr create --base develop --head "$bump_branch" --title "Release: v$next_version" --body "Prepare the next patch release during promotion. Required checks run before this PR is merged."
-            gh workflow run ci.yml --ref "$bump_branch" --repo "$GH_REPO"
-            gh workflow run security.yml --ref "$bump_branch" --repo "$GH_REPO"
-            gh workflow run dco.yml --ref "$bump_branch" --repo "$GH_REPO" --field base="$SHA"
+            bump_pr="$(gh pr list --state open --base develop --head "$bump_branch" --json number --jq '.[0].number')"
+            if [ -z "$bump_pr" ]; then
+              bump_pr_state="$(gh pr list --state all --base develop --head "$bump_branch" --json state --jq '.[0].state // empty')"
+              if [ "$bump_pr_state" = CLOSED ]; then
+                echo "version-bump PR was closed without merging"
+                exit 0
+              fi
+              gh pr create --base develop --head "$bump_branch" --title "Release: v$next_version" --body "Prepare the next patch release during promotion. Required checks run before this PR is merged."
+            fi
+
+            ensure_workflow_run ci.yml "$bump_sha" "$bump_branch" "" workflow_dispatch
+            ensure_workflow_run security.yml "$bump_sha" "$bump_branch" "" workflow_dispatch
+            ensure_workflow_run dco.yml "$bump_sha" "$bump_branch" "$SHA" workflow_dispatch
             exit 0
           fi
 
@@ -185,11 +281,51 @@ jobs:
             echo "develop version $develop_version is not the next patch after main $main_version" >&2
             exit 1
           fi
+
           if [ "$EVENT" = push ]; then
             if ! check_required "$SHA" test reuse zizmor; then exit 0; fi
           else
             if ! check_required "$SHA" test reuse zizmor dco; then exit 0; fi
           fi
+
+          expected_dir="$(mktemp -d "$RUNNER_TEMP/release-notes-expected.XXXXXX")"
+          git archive "$SHA" | tar -x -C "$expected_dir"
+          node "$RUNNER_TEMP/refresh-promotion-changelog.js" "$expected_dir"
+          if ! git show "$SHA:CHANGELOG.md" | cmp -s - "$expected_dir/CHANGELOG.md"; then
+            refresh_branch="release-notes/v$develop_version"
+            git checkout -B "$refresh_branch" "$SHA"
+            cp "$expected_dir/CHANGELOG.md" "$GITHUB_WORKSPACE/CHANGELOG.md"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add CHANGELOG.md
+            git commit -s -m "chore: update v$develop_version release notes"
+            git_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+            git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $git_auth" push --force origin "$refresh_branch"
+            unset git_auth
+            rm -rf "$expected_dir"
+
+            refresh_pr="$(gh pr list --state open --base develop --head "$refresh_branch" --json number --jq '.[0].number')"
+            if [ -z "$refresh_pr" ]; then
+              refresh_pr_state="$(gh pr list --state all --base develop --head "$refresh_branch" --json state --jq '.[0].state // empty')"
+              if [ "$refresh_pr_state" = CLOSED ]; then
+                echo "release-note refresh PR was closed without merging"
+                exit 0
+              fi
+              gh pr create --base develop --head "$refresh_branch" --title "Release: update v$develop_version notes" --body "Move notes added to Unreleased into the pending v$develop_version release. Required checks run before this metadata PR is merged."
+            fi
+
+            refresh_sha="$(git ls-remote origin "refs/heads/$refresh_branch" | awk 'NR == 1 {print $1}')"
+            [[ "$refresh_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid release-note refresh SHA" >&2; exit 1; }
+            ensure_workflow_run ci.yml "$refresh_sha" "$refresh_branch" "" workflow_dispatch
+            ensure_workflow_run security.yml "$refresh_sha" "$refresh_branch" "" workflow_dispatch
+            ensure_workflow_run dco.yml "$refresh_sha" "$refresh_branch" "$SHA" workflow_dispatch
+            exit 0
+          fi
+          rm -rf "$expected_dir"
+
+          refresh_branch="release-notes/v$develop_version"
+          refresh_pr="$(gh pr list --state open --base develop --head "$refresh_branch" --json number --jq '.[0].number')"
+          if [ -n "$refresh_pr" ]; then gh pr close "$refresh_pr"; fi
 
           pr="$(gh pr list --state open --base main --head develop --json number --jq '.[0].number')"
           if [ -z "$pr" ]; then
@@ -229,6 +365,7 @@ jobs:
       contents: write
       actions: write
       pull-requests: read
+      checks: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -241,6 +378,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ inputs.pull_request }}
           MERGE_SHA: ${{ inputs.merge_sha }}
+          RELEASED_TAG: ${{ inputs.released_tag }}
+          SOURCE_PR_NUMBER: ${{ inputs.source_pull_request }}
           CODEOWNER_LOGIN: jeancarlos
         run: |
           set -euo pipefail
@@ -253,7 +392,49 @@ jobs:
           [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid promotion head SHA" >&2; exit 1; }
           reviews="$(gh api "repos/$GH_REPO/pulls/$PR_NUMBER/reviews?per_page=100" --paginate --slurp)"
           review_state="$(jq -r --arg login "$CODEOWNER_LOGIN" --arg sha "$HEAD_SHA" '[.[][] | select(.user.login == $login and .commit_id == $sha and .state != "COMMENTED")] | sort_by(.submitted_at) | last | .state // ""' <<< "$reviews")"
-          [ "$review_state" = APPROVED ] || { echo "merged promotion lacks code-owner approval on $HEAD_SHA" >&2; exit 1; }
+          source_head_sha=""
+          source_review_state=""
+          source_bootstrap=false
+          if [ -n "$SOURCE_PR_NUMBER" ]; then
+            [[ "$SOURCE_PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "invalid source PR number" >&2; exit 1; }
+            source_pr_data="$(gh pr view "$SOURCE_PR_NUMBER" --repo "$GH_REPO" --json state,baseRefName,headRefOid,mergeCommit --jq '{state,baseRefName,headRefOid,mergeSha:.mergeCommit.oid}')"
+            [ "$(jq -r .state <<< "$source_pr_data")" = MERGED ] && [ "$(jq -r .baseRefName <<< "$source_pr_data")" = develop ] && [ "$(jq -r .mergeSha <<< "$source_pr_data")" = "$HEAD_SHA" ] || {
+              echo "source PR #$SOURCE_PR_NUMBER is not the exact merged develop change" >&2
+              exit 1
+            }
+            source_head_sha="$(jq -r .headRefOid <<< "$source_pr_data")"
+            source_reviews="$(gh api "repos/$GH_REPO/pulls/$SOURCE_PR_NUMBER/reviews?per_page=100" --paginate --slurp)"
+            source_review_state="$(jq -r --arg login "$CODEOWNER_LOGIN" --arg sha "$source_head_sha" '[.[][] | select(.user.login == $login and .commit_id == $sha and .state != "COMMENTED")] | sort_by(.submitted_at) | last | .state // ""' <<< "$source_reviews")"
+          fi
+          if [ "$review_state" != APPROVED ]; then
+            [ -z "$review_state" ] || { echo "promotion PR has an explicit $review_state review" >&2; exit 1; }
+            [ "$source_review_state" = APPROVED ] || { echo "source PR #$SOURCE_PR_NUMBER lacks code-owner approval on $source_head_sha" >&2; exit 1; }
+            source_bootstrap=true
+          fi
+          dco_result="$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/check-runs?filter=latest&per_page=100" --jq '[.check_runs[] | select(.name == "dco")] | {total:length,success:([.[] | select(.conclusion == "success")] | length)}')"
+          dco_total="$(jq -r .total <<< "$dco_result")"
+          dco_success="$(jq -r .success <<< "$dco_result")"
+          if [ "$dco_success" -eq 0 ] && [ "$dco_total" -eq 0 ] && [ "$source_bootstrap" = true ]; then
+            dco_success="$(gh api "repos/$GH_REPO/commits/$source_head_sha/check-runs?filter=latest&per_page=100" --jq '[.check_runs[] | select(.name == "dco" and .conclusion == "success")] | length')"
+            if [ "$dco_success" -gt 0 ]; then echo "using DCO validation from the exact merged source PR head"; fi
+          fi
+          if [ "$dco_success" -eq 0 ]; then
+            if [ "$dco_total" -eq 0 ]; then
+              base_sha="$(gh api "repos/$GH_REPO/commits/$MERGE_SHA" --jq '.parents[0].sha')"
+              [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid DCO base SHA" >&2; exit 1; }
+              dco_ref="dco-validation/$HEAD_SHA"
+              if dco_ref_data="$(gh api "repos/$GH_REPO/git/ref/heads/$dco_ref" 2>/dev/null)"; then
+                [ "$(jq -r .object.sha <<< "$dco_ref_data")" = "$HEAD_SHA" ] || { echo "DCO ref points to a different commit" >&2; exit 1; }
+              else
+                gh api --method POST "repos/$GH_REPO/git/refs" -f ref="refs/heads/$dco_ref" -f sha="$HEAD_SHA" >/dev/null
+              fi
+              gh workflow run dco.yml --ref "$dco_ref" --repo "$GH_REPO" --field base="$base_sha" --field head="$HEAD_SHA"
+              echo "dispatched DCO validation for the bootstrap promotion head"
+              exit 0
+            fi
+            echo "merged promotion lacks a passing DCO check on $HEAD_SHA" >&2
+            exit 1
+          fi
           version="$(node -e '
           const fs = require("fs");
           const config = fs.readFileSync("config.xml", "utf8");
@@ -266,14 +447,51 @@ jobs:
           ')"
           tag="v$version"
           merge_sha="$MERGE_SHA"
+          tag_exists=false
           if tag_ref="$(gh api "repos/$GH_REPO/git/ref/tags/$tag" 2>/dev/null)"; then
             tag_sha="$(printf '%s' "$tag_ref" | jq -r .object.sha)"
             [ "$tag_sha" = "$merge_sha" ] || { echo "tag $tag points to a different commit" >&2; exit 1; }
-          else
+            tag_exists=true
+          fi
+          release_exists=false
+          if gh release view "$tag" --repo "$GH_REPO" >/dev/null 2>&1; then release_exists=true; fi
+          latest_tag="$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name)"
+          [[ "$latest_tag" == v* ]] || { echo "latest release has an invalid tag: $latest_tag" >&2; exit 1; }
+          latest_version="${latest_tag#v}"
+          if [ "$source_bootstrap" = true ]; then
+            [ "$version" = 1.0.3 ] && [ -z "$RELEASED_TAG" ] && {
+              [ "$latest_version" = 1.0.2 ] || [ "$release_exists" = true ]
+            } || {
+              echo "source PR bootstrap is only allowed for the initial v1.0.3 promotion" >&2
+              exit 1
+            }
+          fi
+          if [ -n "$RELEASED_TAG" ]; then
+            released_tag="$RELEASED_TAG"
+            [[ "$released_tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { echo "invalid completed release tag" >&2; exit 1; }
+            gh release view "$released_tag" --repo "$GH_REPO" >/dev/null
+            released_version="${released_tag#v}"
+            latest_version="$(node -e '
+            const parse = value => value.split(".").map(BigInt);
+            const [latest, released] = process.argv.slice(1).map(parse);
+            for (let i = 0; i < 3; i++) {
+              if (latest[i] > released[i]) { process.stdout.write(process.argv[1]); process.exit(0); }
+              if (released[i] > latest[i]) { process.stdout.write(process.argv[2]); process.exit(0); }
+            }
+            process.stdout.write(process.argv[1]);
+            ' "$latest_version" "$released_version")"
+          fi
+          expected_version="$(node -e 'const match = process.argv[1].match(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/); if (!match) process.exit(1); process.stdout.write(`${match[1]}.${match[2]}.${BigInt(match[3]) + 1n}`)' "$latest_version")"
+          if [ "$version" != "$expected_version" ] && [ "$release_exists" = false ]; then
+            echo "release version $version is queued; the next patch after latest release $latest_version is $expected_version"
+            exit 0
+          fi
+          if [ "$tag_exists" = false ]; then
             gh api --method POST "repos/$GH_REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$merge_sha" >/dev/null
           fi
-          if gh release view "$tag" --repo "$GH_REPO" >/dev/null 2>&1; then
-            echo "release $tag already exists"
+          release_runs="$(gh run list --workflow release.yml --commit "$merge_sha" --repo "$GH_REPO" --limit 100 --json headBranch,status,conclusion --jq "[.[] | select(.headBranch == \"$tag\" and (.status != \"completed\" or .conclusion == \"success\"))] | length")"
+          if [ "$release_runs" -gt 0 ]; then
+            echo "release workflow for $tag is already queued, running, or complete"
             exit 0
           fi
           gh workflow run release.yml --ref "$tag" --repo "$GH_REPO"

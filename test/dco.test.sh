@@ -38,6 +38,18 @@ else
   fail "DCO dispatch can scope validation to a chosen base commit"
 fi
 
+if grep -q 'inputs.head' "$ROOT/.github/workflows/dco.yml" && grep -q 'bash tools/check-dco.sh "$base" "$head"' "$ROOT/.github/workflows/dco.yml" && grep -q '\[ "$DISPATCH_HEAD" = "$GITHUB_SHA" \]' "$ROOT/.github/workflows/dco.yml"; then
+  ok "DCO dispatch validates the exact workflow commit"
+else
+  fail "DCO dispatch validates the exact workflow commit"
+fi
+
+if grep -q '^  cleanup-dco-ref:' "$ROOT/.github/workflows/dco.yml" && grep -q 'git/refs/heads/$REF_NAME' "$ROOT/.github/workflows/dco.yml" && grep -qF 'Reference does not exist' "$ROOT/.github/workflows/dco.yml" && grep -qF '(404|422)' "$ROOT/.github/workflows/dco.yml"; then
+  ok "DCO validation cleans up its temporary ref idempotently"
+else
+  fail "DCO validation cleans up its temporary ref idempotently"
+fi
+
 commit signed "" 2026-10-20T00:00:00Z "Signed-off-by: Dev <dev@example.com>"
 if run; then ok "A signed commit passes"; else fail "A signed commit passes"; fi
 

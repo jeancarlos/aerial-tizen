@@ -62,9 +62,16 @@ if [ "$state" = OPEN ]; then
     exit 1
   }
 
-  for name in test reuse zizmor; do
-    count="$(gh api "repos/$GH_REPO/commits/$sha/check-runs?filter=latest&per_page=100" --jq "[.check_runs[] | select(.name == \"$name\" and .conclusion == \"success\")] | length")"
-    if [ "$count" -eq 0 ]; then
+  for name in test reuse zizmor dco; do
+    result="$(gh api "repos/$GH_REPO/commits/$sha/check-runs?filter=latest&per_page=100" --jq "[.check_runs[] | select(.name == \"$name\")] | {total:length,success:([.[] | select(.conclusion == \"success\")] | length)}")"
+    total="$(jq -r .total <<< "$result")"
+    success="$(jq -r .success <<< "$result")"
+    if [ "$success" -eq 0 ]; then
+      if [ "$name" = dco ] && [ "$total" -eq 0 ]; then
+        main_sha="$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)"
+        [[ "$main_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid main SHA for DCO validation" >&2; exit 1; }
+        gh workflow run dco.yml --ref develop --repo "$GH_REPO" --field base="$main_sha"
+      fi
       echo "promotion PR #$pr is waiting for $name on $sha"
       exit 0
     fi
@@ -72,6 +79,17 @@ if [ "$state" = OPEN ]; then
 
   if [ "$(review_state)" != APPROVED ]; then
     echo "promotion PR #$pr is waiting for code-owner approval on $sha"
+    exit 0
+  fi
+
+  changelog_dir="$(mktemp -d)"
+  trap 'rm -rf "$changelog_dir"' EXIT
+  gh api "repos/$GH_REPO/contents/CHANGELOG.md?ref=$sha" --jq '.content | @base64d' > "$changelog_dir/CHANGELOG.md"
+  printf '{"version":"%s"}\n' "$head_version" > "$changelog_dir/package.json"
+  cp "$changelog_dir/CHANGELOG.md" "$changelog_dir/CHANGELOG.before.md"
+  node "$(dirname "${BASH_SOURCE[0]}")/refresh-promotion-changelog.js" "$changelog_dir" >/dev/null
+  if ! cmp -s "$changelog_dir/CHANGELOG.before.md" "$changelog_dir/CHANGELOG.md"; then
+    echo "promotion PR #$pr is waiting for release-note refresh on $sha"
     exit 0
   fi
   gh pr merge "$pr" --repo "$GH_REPO" --merge --match-head-commit "$sha"

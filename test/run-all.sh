@@ -41,6 +41,7 @@ if bash "$DIR/version.test.sh"; then :; else failed=1; fi
 echo
 echo "== promotion release =="
 if node "$DIR/promotion-release.test.js"; then :; else failed=1; fi
+if node "$DIR/refresh-promotion-changelog.test.js"; then :; else failed=1; fi
 
 echo
 echo "== thumbnails =="
@@ -57,6 +58,7 @@ if bash "$DIR/workflows.test.sh"; then :; else failed=1; fi
 echo
 echo "== promotion merge =="
 if bash "$DIR/promotion-merge.test.sh"; then :; else failed=1; fi
+if bash "$DIR/resume-promotion-release.test.sh"; then :; else failed=1; fi
 
 echo
 echo "== dco =="

@@ -8,6 +8,10 @@ on:
         description: Commit to start DCO validation from
         required: false
         type: string
+      head:
+        description: Exact commit to validate
+        required: false
+        type: string
   pull_request:
     branches: [develop]
 permissions:
@@ -18,6 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.head || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: every commit is signed off
@@ -25,6 +30,7 @@ jobs:
           PR_BASE: ${{ github.event.pull_request.base.sha }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           DISPATCH_BASE: ${{ inputs.base }}
+          DISPATCH_HEAD: ${{ inputs.head }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
             bash tools/check-dco.sh "$PR_BASE" "$PR_HEAD"
@@ -33,5 +39,36 @@ jobs:
             base="$DISPATCH_BASE"
             if [ -z "$base" ]; then base="$(git merge-base origin/main HEAD)"; fi
             [[ "$base" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid DCO base SHA" >&2; exit 1; }
-            bash tools/check-dco.sh "$base" HEAD
+            head=HEAD
+            if [ -n "$DISPATCH_HEAD" ]; then
+              [[ "$DISPATCH_HEAD" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid DCO head SHA" >&2; exit 1; }
+              [ "$DISPATCH_HEAD" = "$GITHUB_SHA" ] || { echo "DCO head must match the workflow run SHA" >&2; exit 1; }
+              head="$DISPATCH_HEAD"
+            fi
+            bash tools/check-dco.sh "$base" "$head"
+          fi
+  cleanup-dco-ref:
+    if: always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/dco-validation/')
+    needs: dco
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: delete the temporary validation ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          DISPATCH_HEAD: ${{ inputs.head }}
+        run: |
+          set -euo pipefail
+          [[ "$REF_NAME" =~ ^dco-validation/[0-9a-f]{40}$ && "$DISPATCH_HEAD" =~ ^[0-9a-f]{40}$ ]] || exit 0
+          [ "${REF_NAME#*/}" = "$DISPATCH_HEAD" ] || { echo "temporary DCO ref does not match the requested commit" >&2; exit 1; }
+          if response="$(gh api --include --method DELETE "repos/$GH_REPO/git/refs/heads/$REF_NAME" 2>&1)"; then
+            :
+          elif grep -Eq '^HTTP(/[0-9.]+)? (404|422)([[:space:]]|:|$)' <<< "$response" && grep -q 'Reference does not exist' <<< "$response"; then
+            echo "temporary DCO ref was already removed"
+          else
+            echo "$response" >&2
+            exit 1
           fi

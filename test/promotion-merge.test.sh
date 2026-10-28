@@ -16,6 +16,19 @@ JSON
 cat > "$TMP/project/package-lock.json" <<'JSON'
 {"version":"1.0.3","packages":{"":{"version":"1.0.3"}}}
 JSON
+cat > "$TMP/project/CHANGELOG.md" <<'MD'
+# Changelog
+
+## Unreleased
+
+## 1.0.3 - 2026-10-28
+
+- Release notes.
+
+## 1.0.2 - 2026-10-17
+
+- Previous release.
+MD
 cat > "$TMP/bin/gh" <<'GH'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -23,17 +36,29 @@ printf '%s\n' "$*" >> "$GH_LOG"
 case "${1:-}" in
   api)
     endpoint=""
+    query="$*"
     for arg in "$@"; do
       case "$arg" in
         */check-runs\?*) endpoint=checks ;;
         */pulls/*/reviews*) endpoint=reviews ;;
         */contents/*) endpoint=contents; file="${arg#*contents/}"; file="${file%%\?*}" ;;
+        */git/ref/heads/main) endpoint=main-ref ;;
       esac
     done
     case "$endpoint" in
-      checks) printf '%s\n' "${GH_CHECKS:-1}" ;;
+      checks)
+        if [[ "$query" == *'name == "dco"'* ]]; then
+          dco_total="${GH_DCO_PRESENT:-1}"
+          dco_success="${GH_DCO_SUCCESS:-1}"
+          [ "$dco_total" -gt 0 ] || dco_success=0
+          printf '{"total":%s,"success":%s}\n' "$dco_total" "$dco_success"
+        else
+          printf '{"total":1,"success":%s}\n' "${GH_CHECKS:-1}"
+        fi
+        ;;
       reviews) printf '%s\n' "${GH_REVIEWS_JSON:-[]}" ;;
       contents) cat "$GH_PROJECT_ROOT/$file" ;;
+      main-ref) printf '%s\n' "${GH_MAIN_SHA:-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}" ;;
       *) exit 1 ;;
     esac
     ;;
@@ -62,11 +87,12 @@ passed=0
 failed=0
 ok() { passed=$((passed + 1)); echo "  ✓ $1"; }
 fail() { failed=$((failed + 1)); echo "  ✗ $1"; }
-run() { PATH="$TMP/bin:$PATH" GH_LOG="$TMP/gh.log" GH_PR_STATE_FILE="$TMP/pr-state" GH_PROJECT_ROOT="$TMP/project" BASE_VERSION="${BASE_VERSION:-1.0.2}" GH_HEAD_SHA=0123456789012345678901234567890123456789 GH_MERGE_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GH_REPO=jeancarlos/aerial-tizen CODEOWNER_LOGIN=jeancarlos GH_CHECKS="${GH_CHECKS:-1}" GH_REVIEWS_JSON="${GH_REVIEWS_JSON:-[]}" bash "$ROOT/tools/merge-promotion-pr.sh" 42 0123456789012345678901234567890123456789; }
+run() { PATH="$TMP/bin:$PATH" GH_LOG="$TMP/gh.log" GH_PR_STATE_FILE="$TMP/pr-state" GH_PROJECT_ROOT="$TMP/project" BASE_VERSION="${BASE_VERSION:-1.0.2}" GH_HEAD_SHA=0123456789012345678901234567890123456789 GH_MERGE_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GH_MAIN_SHA=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb GH_REPO=jeancarlos/aerial-tizen CODEOWNER_LOGIN=jeancarlos GH_CHECKS="${GH_CHECKS:-1}" GH_DCO_PRESENT="${GH_DCO_PRESENT:-1}" GH_DCO_SUCCESS="${GH_DCO_SUCCESS:-1}" GH_REVIEWS_JSON="${GH_REVIEWS_JSON:-[]}" bash "$ROOT/tools/merge-promotion-pr.sh" 42 0123456789012345678901234567890123456789; }
 
 approval='{"user":{"login":"jeancarlos"},"commit_id":"0123456789012345678901234567890123456789","state":"APPROVED","submitted_at":"2026-10-20T00:00:00Z"}'
 comment='{"user":{"login":"jeancarlos"},"commit_id":"0123456789012345678901234567890123456789","state":"COMMENTED","submitted_at":"2026-10-21T00:00:00Z"}'
 changes_requested='{"user":{"login":"jeancarlos"},"commit_id":"0123456789012345678901234567890123456789","state":"CHANGES_REQUESTED","submitted_at":"2026-10-22T00:00:00Z"}'
+dismissed='{"user":{"login":"jeancarlos"},"commit_id":"0123456789012345678901234567890123456789","state":"DISMISSED","submitted_at":"2026-10-23T00:00:00Z"}'
 
 echo ""
 echo "Promotion merge checks:"
@@ -102,6 +128,54 @@ fi
 
 : > "$TMP/gh.log"
 printf 'OPEN\n' > "$TMP/pr-state"
+cat > "$TMP/project/CHANGELOG.md" <<'MD'
+# Changelog
+
+## Unreleased
+
+- Notes arrived while the promotion was waiting.
+
+## 1.0.3 - 2026-10-28
+
+- Release notes.
+
+## 1.0.2 - 2026-10-17
+
+- Previous release.
+MD
+if GH_REVIEWS_JSON="[[$approval]]" run; then
+  if ! grep -q '^merge ' "$TMP/gh.log"; then ok "Pending Unreleased notes block an approved promotion merge"; else fail "Pending Unreleased notes block an approved promotion merge"; fi
+else
+  fail "Pending Unreleased notes block an approved promotion merge"
+fi
+cat > "$TMP/project/CHANGELOG.md" <<'MD'
+# Changelog
+
+## Unreleased
+
+## 1.0.3 - 2026-10-28
+
+- Release notes.
+
+## 1.0.2 - 2026-10-17
+
+- Previous release.
+MD
+
+: > "$TMP/gh.log"
+printf 'OPEN\n' > "$TMP/pr-state"
+if GH_DCO_PRESENT=0 GH_REVIEWS_JSON="[[$approval]]" run; then
+  if ! grep -q '^merge ' "$TMP/gh.log" && grep -qF 'workflow run dco.yml --ref develop --repo jeancarlos/aerial-tizen --field base=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' "$TMP/gh.log"; then
+    ok "A missing DCO check is dispatched and blocks promotion"
+  else
+    fail "A missing DCO check is dispatched and blocks promotion"
+  fi
+else
+  fail "A missing DCO check is dispatched and blocks promotion"
+fi
+
+: > "$TMP/gh.log"
+printf 'OPEN\n' > "$TMP/pr-state"
 if GH_REVIEWS_JSON="[[$approval,$changes_requested]]" run; then
   if ! grep -q '^merge ' "$TMP/gh.log" && ! grep -q '^workflow run ' "$TMP/gh.log"; then
     ok "A later changes-requested review blocks the merge"
@@ -110,6 +184,18 @@ if GH_REVIEWS_JSON="[[$approval,$changes_requested]]" run; then
   fi
 else
   fail "A later changes-requested review blocks the merge"
+fi
+
+: > "$TMP/gh.log"
+printf 'OPEN\n' > "$TMP/pr-state"
+if GH_REVIEWS_JSON="[[$approval,$dismissed]]" run; then
+  if ! grep -q '^merge ' "$TMP/gh.log" && ! grep -q '^workflow run ' "$TMP/gh.log"; then
+    ok "A dismissed approval blocks the merge"
+  else
+    fail "A dismissed approval blocks the merge"
+  fi
+else
+  fail "A dismissed approval blocks the merge"
 fi
 
 : > "$TMP/gh.log"
