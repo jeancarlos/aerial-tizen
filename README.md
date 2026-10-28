@@ -132,6 +132,8 @@ Use `sdb` for this. `tizen uninstall` and `vd_uninstallapp` fail silently here. 
 
 ## Verify a release
 
+Every promotion from develop to main now prepares the next patch release automatically. The workflow opens a signed-off version bump PR to develop, waits for CI, security, and DCO checks, then promotes the versioned changes and publishes the signed archive. Unreleased changelog entries become the release notes; an empty section produces a maintenance release note.
+
 Every release archive is signed with cosign using GitHub's keyless identity. Download the `.zip` and its `.zip.sigstore.json` from the release, then:
 
 ```bash

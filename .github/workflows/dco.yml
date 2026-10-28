@@ -2,6 +2,12 @@
 # SPDX-License-Identifier: MIT
 name: dco
 on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Commit to start DCO validation from
+        required: false
+        type: string
   pull_request:
     branches: [develop]
 permissions:
@@ -16,6 +22,16 @@ jobs:
           persist-credentials: false
       - name: every commit is signed off
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
-        run: bash tools/check-dco.sh "$BASE" "$HEAD"
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          DISPATCH_BASE: ${{ inputs.base }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            bash tools/check-dco.sh "$PR_BASE" "$PR_HEAD"
+          else
+            git fetch origin main develop
+            base="$DISPATCH_BASE"
+            if [ -z "$base" ]; then base="$(git merge-base origin/main HEAD)"; fi
+            [[ "$base" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid DCO base SHA" >&2; exit 1; }
+            bash tools/check-dco.sh "$base" HEAD
+          fi

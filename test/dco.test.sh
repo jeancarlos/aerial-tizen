@@ -26,6 +26,18 @@ run() { DCO_FROM=2026-10-17T17:00:00Z bash "$ROOT/tools/check-dco.sh" "$base" HE
 echo ""
 echo "DCO checks:"
 
+if grep -q '^  workflow_dispatch:' "$ROOT/.github/workflows/dco.yml"; then
+  ok "DCO workflow can validate generated branches"
+else
+  fail "DCO workflow can validate generated branches"
+fi
+
+if grep -q 'inputs.base' "$ROOT/.github/workflows/dco.yml"; then
+  ok "DCO dispatch can scope validation to a chosen base commit"
+else
+  fail "DCO dispatch can scope validation to a chosen base commit"
+fi
+
 commit signed "" 2026-10-20T00:00:00Z "Signed-off-by: Dev <dev@example.com>"
 if run; then ok "A signed commit passes"; else fail "A signed commit passes"; fi
 
