@@ -6,11 +6,14 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 fails=0
 check() { if "${@:2}"; then echo "ok   $1"; else echo "FAIL $1"; fails=$((fails+1)); fi; }
 has() { grep -qF -- "$2" "$ROOT/.github/workflows/$1"; }
+has_tool() { grep -qF -- "$2" "$ROOT/tools/$1"; }
 check "dependabot-merge selects the PR from the run" has dependabot-merge.yml 'pull_requests[0].number'
 check "dependabot-merge verifies the author" has dependabot-merge.yml 'app/dependabot develop false'
 check "dependabot-merge dispatches security" has dependabot-merge.yml 'gh workflow run security.yml --ref develop'
 check "promote listens for required workflow completions" has promote.yml 'workflows: [ci, security, dco]'
 check "promote waits for every required check" has promote.yml 'for name in "$@"; do'
+check "workflow-run promotion token can read check runs" bash -c "sed -n '/^  promote:/,/^  merge-approved-promotion:/p' '$ROOT/.github/workflows/promote.yml' | grep -q 'checks: read'"
+check "review continuation token can read check runs" bash -c "sed -n '/^  merge-approved-promotion:/,/^  publish-promotion-release:/p' '$ROOT/.github/workflows/promote.yml' | grep -q 'checks: read'"
 check "promote requires CI and security checks before main promotion" has promote.yml 'check_required "$SHA" test reuse zizmor'
 check "promote checks DCO before merging a version bump" has promote.yml 'check_required "$SHA" test reuse zizmor dco'
 check "promote computes numeric patch versions" has promote.yml 'match(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/)'
@@ -29,8 +32,18 @@ check "promote merges version bump at the verified head" has promote.yml 'gh pr 
 check "promote dispatches CI after the protected develop merge" has promote.yml 'gh workflow run ci.yml --ref develop --repo "$GH_REPO"'
 check "promote dispatches security after the protected develop merge" has promote.yml 'gh workflow run security.yml --ref develop --repo "$GH_REPO"'
 check "promote dispatches scoped DCO after the protected develop merge" has promote.yml 'gh workflow run dco.yml --ref develop --repo "$GH_REPO" --field base="$base"'
-check "promote creates the version tag at the merge commit" has promote.yml 'ref="refs/tags/$tag" -f sha="$merge_sha"'
+check "promote resumes after a code-owner review" has promote.yml 'pull_request_review:'
+check "promote checks code-owner identity and reviewed commit" bash -c "grep -qF CODEOWNER_LOGIN '$ROOT/tools/merge-promotion-pr.sh' && grep -qF 'commit_id ==' '$ROOT/tools/merge-promotion-pr.sh'"
+check "promote merges only after approval and passing checks" has promote.yml 'bash tools/merge-promotion-pr.sh "$pr" "$SHA"'
+check "review events can resume the protected main promotion" has promote.yml 'bash tools/merge-promotion-pr.sh "$PR_NUMBER" "$SHA"'
+check "promote release runs after the PR closes" has promote.yml 'github.event.pull_request.merged == true'
+check "promote release requires code-owner approval on the merged head" bash -c "grep -qF 'CODEOWNER_LOGIN: jeancarlos' '$ROOT/.github/workflows/promote.yml' && grep -qF 'HEAD_SHA: \${{ github.event.pull_request.head.sha }}' '$ROOT/.github/workflows/promote.yml'"
+check "promote release tags the recorded merge commit" has promote.yml 'ref="refs/tags/$tag" -f sha="$merge_sha"'
+check "promote validates release metadata as data from the merge commit" has promote.yml 'const config = fs.readFileSync("config.xml", "utf8")'
+check "promote release does not execute scripts from the merged commit" bash -c "! grep -q 'bash tools/check-version.sh' '$ROOT/.github/workflows/promote.yml'"
 check "promote dispatches release on the version tag" has promote.yml 'gh workflow run release.yml --ref "$tag" --repo "$GH_REPO"'
+check "promote release retry runs even when main already contains develop" has promote.yml 'name: publish promotion release'
+check "promote release verifies a pre-existing tag before skipping" has promote.yml '[ "$tag_sha" = "$merge_sha" ]'
 check "promote does not push to protected develop" bash -c "! grep -q 'git push origin .*develop' '$ROOT/.github/workflows/promote.yml'"
 check "promote serializes runs per branch" has promote.yml 'cancel-in-progress: false'
 check "promote ignores stale workflow runs" has promote.yml 'if [ "$latest_sha" != "$SHA" ]; then'
@@ -49,5 +62,5 @@ check "ci runs the linter" has ci.yml 'npm run lint'
 check "lint script exists" grep -q '"lint": "eslint .' "$ROOT/package.json"
 check "release pins the signing identity" has release.yml 'workflows/release.yml@${REF}'
 check "release no longer accepts any workflow" bash -c "! grep -q certificate-identity-regexp '$ROOT/.github/workflows/release.yml'"
-check "pull request workflows skip PRs into main" bash -c "for f in '$ROOT'/.github/workflows/*.yml; do grep -q '^  pull_request:' \$f && ! grep -A1 '^  pull_request:' \$f | grep -q 'branches: \[develop\]' && exit 1; done; exit 0"
+check "application pull request workflows skip PRs into main" bash -c "for f in '$ROOT'/.github/workflows/*.yml; do [ \"\$f\" = '$ROOT/.github/workflows/promote.yml' ] && continue; grep -q '^  pull_request:' \$f && ! grep -A1 '^  pull_request:' \$f | grep -q 'branches: \[develop\]' && exit 1; done; exit 0"
 exit "$fails"

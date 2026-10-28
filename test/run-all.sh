@@ -55,6 +55,10 @@ echo "== workflows =="
 if bash "$DIR/workflows.test.sh"; then :; else failed=1; fi
 
 echo
+echo "== promotion merge =="
+if bash "$DIR/promotion-merge.test.sh"; then :; else failed=1; fi
+
+echo
 echo "== dco =="
 if bash "$DIR/dco.test.sh"; then :; else failed=1; fi
 

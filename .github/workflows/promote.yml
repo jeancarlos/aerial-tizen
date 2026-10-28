@@ -8,18 +8,24 @@ on:
     branches:
       - develop
       - "release-bump/**"
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
 permissions: {}
 concurrency:
-  group: promote-${{ github.event.workflow_run.head_branch }}
+  group: promote-${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}
   cancel-in-progress: false
 jobs:
   promote:
-    if: github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') && github.repository_owner == 'jeancarlos'
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') && github.repository_owner == 'jeancarlos'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
       actions: write
+      checks: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -176,21 +182,79 @@ jobs:
 
           pr="$(gh pr list --state open --base main --head develop --json number --jq '.[0].number')"
           if [ -z "$pr" ]; then
-            pr="$(gh pr create --base main --head develop --title "Release: $(date -u +%Y-%m-%d) develop to main" --body "CI and DCO passed on develop. This promotion publishes v$develop_version.")"
+            pr="$(gh pr create --base main --head develop --title "Release: $(date -u +%Y-%m-%d) develop to main" --body "CI and security checks passed on develop. This promotion publishes v$develop_version after code-owner approval.")"
             pr="${pr##*/}"
           fi
-          gh pr merge "$pr" --merge --match-head-commit "$SHA"
-          state="$(gh pr view "$pr" --json state --jq .state)"
-          [ "$state" = MERGED ] || { echo "promotion PR #$pr did not merge" >&2; exit 1; }
-          merge_sha="$(gh pr view "$pr" --json mergeCommit --jq .mergeCommit.oid)"
-          tag="v$develop_version"
+          bash tools/merge-promotion-pr.sh "$pr" "$SHA"
+
+  merge-approved-promotion:
+    if: github.repository_owner == 'jeancarlos' && ((github.event_name == 'pull_request' && github.event.pull_request.action != 'closed' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop') || (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+      - name: merge after code-owner approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CODEOWNER_LOGIN: jeancarlos
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash tools/merge-promotion-pr.sh "$PR_NUMBER" "$SHA"
+
+  publish-promotion-release:
+    if: github.repository_owner == 'jeancarlos' && github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop'
+    name: publish promotion release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: tag and dispatch the signed release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          CODEOWNER_LOGIN: jeancarlos
+        run: |
+          set -euo pipefail
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$MERGE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid promotion commit SHA" >&2; exit 1; }
+          review_state="$(gh api "repos/$GH_REPO/pulls/$PR_NUMBER/reviews" --jq "[.[] | select(.user.login == \"$CODEOWNER_LOGIN\" and .commit_id == \"$HEAD_SHA\")] | sort_by(.submitted_at) | last | .state // \"\"")"
+          [ "$review_state" = APPROVED ] || { echo "merged promotion lacks code-owner approval on $HEAD_SHA" >&2; exit 1; }
+          version="$(node -e '
+          const fs = require("fs");
+          const config = fs.readFileSync("config.xml", "utf8");
+          const widget = config.match(/<widget\b[^>]*\bversion="([^"]+)"/);
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+          const versions = [widget && widget[1], pkg.version, lock.version, lock.packages && lock.packages[""] && lock.packages[""].version];
+          if (versions.some(version => !version) || !versions.every(version => version === versions[0]) || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(versions[0])) process.exit(1);
+          process.stdout.write(versions[0]);
+          ')"
+          tag="v$version"
+          merge_sha="$MERGE_SHA"
           if tag_ref="$(gh api "repos/$GH_REPO/git/ref/tags/$tag" 2>/dev/null)"; then
             tag_sha="$(printf '%s' "$tag_ref" | jq -r .object.sha)"
             [ "$tag_sha" = "$merge_sha" ] || { echo "tag $tag points to a different commit" >&2; exit 1; }
           else
             gh api --method POST "repos/$GH_REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$merge_sha" >/dev/null
           fi
-          if release="$(gh release view "$tag" --repo "$GH_REPO" 2>/dev/null)"; then
+          if gh release view "$tag" --repo "$GH_REPO" >/dev/null 2>&1; then
             echo "release $tag already exists"
             exit 0
           fi

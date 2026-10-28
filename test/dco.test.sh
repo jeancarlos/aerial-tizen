@@ -56,6 +56,13 @@ git reset -q --hard HEAD~1
 commit badsign "" 2026-10-20T00:00:00Z "Signed-off-by: x"
 if run; then fail "A sign-off without an email is refused"; else ok "A sign-off without an email is refused"; fi
 
+invalid_base=0000000000000000000000000000000000000000
+if DCO_FROM=2026-10-17T17:00:00Z bash "$ROOT/tools/check-dco.sh" "$invalid_base" HEAD >/dev/null 2>&1; then
+  fail "An invalid DCO range is refused"
+else
+  ok "An invalid DCO range is refused"
+fi
+
 echo ""
 if [ "$failed" -eq 0 ]; then
   echo "$((passed + failed)) tests, $passed passed, 0 failed"

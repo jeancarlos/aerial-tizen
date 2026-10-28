@@ -16,6 +16,15 @@ from="${DCO_FROM:-2026-10-17T17:00:00Z}"
 cutoff="$(date -u -d "$from" +%s)"
 missing=0
 
+git rev-parse --verify --quiet --end-of-options "${base}^{commit}" >/dev/null || {
+  echo "invalid DCO base commit: $base" >&2
+  exit 2
+}
+commits="$(git rev-list --no-merges "$base..$head")" || {
+  echo "invalid DCO revision range: $base..$head" >&2
+  exit 2
+}
+
 while read -r sha; do
   [ -n "$sha" ] || continue
   [ "$(git show -s --format=%at "$sha")" -ge "$cutoff" ] || continue
@@ -24,6 +33,6 @@ while read -r sha; do
     echo "missing Signed-off-by: $sha $(git show -s --format=%s "$sha")" >&2
     missing=$((missing + 1))
   fi
-done < <(git rev-list --no-merges "$base..$head")
+done <<< "$commits"
 
 [ "$missing" -eq 0 ]
