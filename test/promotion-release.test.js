@@ -69,6 +69,19 @@ test('changelog rotation preserves Unreleased notes and previous releases', () =
   }
 });
 
+test('changelog rotation ends with one newline', () => {
+  const root = fixture('2.4.8', startingChangelog);
+  try {
+    const result = runHelper(root);
+    assert.strictEqual(result.status, 0, result.stderr);
+    const changelog = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
+    assert.ok(changelog.endsWith('- Previous release.\n'));
+    assert.ok(!changelog.endsWith('\n\n'));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('empty Unreleased section gets a maintenance note', () => {
   const root = fixture('2.4.8', '# Changelog\n\n## Unreleased\n\n## 1.0.2 - 2026-10-17\n\n- Previous release.\n');
   try {

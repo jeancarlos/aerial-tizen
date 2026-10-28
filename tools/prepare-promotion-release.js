@@ -43,7 +43,8 @@ function preparePromotionRelease(root, releaseDate = new Date().toISOString().sl
   const notes = changelog.slice(contentStart, contentEnd).trim() || '- Maintenance release.';
   const prefix = changelog.slice(0, unreleased.index).replace(/\s*$/, '');
   const suffix = nextHeading ? changelog.slice(nextHeading.index).replace(/^\s*/, '') : '';
-  const updatedChangelog = prefix + '\n\n## Unreleased\n\n## ' + nextVersion + ' - ' + releaseDate + '\n\n' + notes + (suffix ? '\n\n' + suffix : '') + '\n';
+  const changelogContent = prefix + '\n\n## Unreleased\n\n## ' + nextVersion + ' - ' + releaseDate + '\n\n' + notes + (suffix ? '\n\n' + suffix : '');
+  const updatedChangelog = changelogContent.replace(/\s*$/, '') + '\n';
 
   const updatedWidget = widget[0].replace(/\bversion="[^"]+"/, 'version="' + nextVersion + '"');
   const updatedConfig = configXml.replace(widget[0], updatedWidget);

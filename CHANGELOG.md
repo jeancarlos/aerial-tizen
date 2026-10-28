@@ -4,6 +4,9 @@ Notable changes per release. Versions follow [Semantic Versioning](https://semve
 
 ## Unreleased
 
+## 1.0.3 - 2026-10-28
+
+- Supports Tizen 5.5 on 2020 TVs and uses ADAPTIVE_INFO for 4K resolution detection.
 - Release archives are stored uncompressed so anyone can rebuild one bit for bit from its tag; the README shows how.
 - The demo shows a real frame of each video, lists all 115 videos with Play buttons and a filter, and can play real video through an optional Cloudflare Worker (`worker/`).
 - CI fails below 90% test coverage, and zizmor is a required check on `main` and `develop`.
