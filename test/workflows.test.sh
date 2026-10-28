@@ -9,7 +9,9 @@ has() { grep -qF -- "$2" "$ROOT/.github/workflows/$1"; }
 has_tool() { grep -qF -- "$2" "$ROOT/tools/$1"; }
 check "dependabot-merge selects the PR from the run" has dependabot-merge.yml 'pull_requests[0].number'
 check "dependabot-merge verifies the author" has dependabot-merge.yml 'app/dependabot develop false'
+check "dependabot merge captures develop before merging" has dependabot-merge.yml 'git/ref/heads/develop'
 check "dependabot-merge dispatches security" has dependabot-merge.yml 'gh workflow run security.yml --ref develop'
+check "dependabot-merge dispatches scoped DCO" has dependabot-merge.yml 'gh workflow run dco.yml --ref develop --repo "$GH_REPO" --field base="$base"'
 check "promote listens for required workflow completions" has promote.yml 'workflows: [ci, security, dco]'
 check "promote waits for every required check" has promote.yml 'for name in "$@"; do'
 check "workflow-run promotion token can read check runs" bash -c "sed -n '/^  promote:/,/^  merge-approved-promotion:/p' '$ROOT/.github/workflows/promote.yml' | grep -q 'checks: read'"
@@ -34,10 +36,15 @@ check "promote dispatches security after the protected develop merge" has promot
 check "promote dispatches scoped DCO after the protected develop merge" has promote.yml 'gh workflow run dco.yml --ref develop --repo "$GH_REPO" --field base="$base"'
 check "promote resumes after a code-owner review" has promote.yml 'pull_request_review:'
 check "promote checks code-owner identity and reviewed commit" bash -c "grep -qF CODEOWNER_LOGIN '$ROOT/tools/merge-promotion-pr.sh' && grep -qF 'commit_id ==' '$ROOT/tools/merge-promotion-pr.sh'"
-check "promote merges only after approval and passing checks" has promote.yml 'bash tools/merge-promotion-pr.sh "$pr" "$SHA"'
-check "review events can resume the protected main promotion" has promote.yml 'bash tools/merge-promotion-pr.sh "$PR_NUMBER" "$SHA"'
-check "promote release runs after the PR closes" has promote.yml 'github.event.pull_request.merged == true'
-check "promote release requires code-owner approval on the merged head" bash -c "grep -qF 'CODEOWNER_LOGIN: jeancarlos' '$ROOT/.github/workflows/promote.yml' && grep -qF 'HEAD_SHA: \${{ github.event.pull_request.head.sha }}' '$ROOT/.github/workflows/promote.yml'"
+check "promote merges only after approval and passing checks" has promote.yml 'BASE_VERSION="$(node -p'
+check "review events can resume the protected main promotion" has promote.yml 'BASE_VERSION="$(node -p'
+check "workflow-run promotion supplies the code-owner identity" bash -c "sed -n '/^  promote:/,/^  merge-approved-promotion:/p' '$ROOT/.github/workflows/promote.yml' | grep -q 'CODEOWNER_LOGIN: jeancarlos'"
+check "approval continuation can merge and dispatch" bash -c "sed -n '/^  merge-approved-promotion:/,/^  publish-promotion-release:/p' '$ROOT/.github/workflows/promote.yml' | grep -q 'contents: write' && sed -n '/^  merge-approved-promotion:/,/^  publish-promotion-release:/p' '$ROOT/.github/workflows/promote.yml' | grep -q 'actions: write'"
+check "promotion release accepts PR and merge SHA inputs" has promote.yml 'merge_sha:'
+check "promotion helper explicitly dispatches the trusted release continuation" has_tool merge-promotion-pr.sh 'gh workflow run promote.yml --ref main --repo "$GH_REPO" --field pull_request="$pr" --field merge_sha="$merge_sha"'
+check "promote release continuation runs only from main dispatch" has promote.yml "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'"
+check "promote release verifies the merged PR and its code-owner approval" bash -c "grep -qF 'PR_NUMBER: \${{ inputs.pull_request }}' '$ROOT/.github/workflows/promote.yml' && grep -qF 'CODEOWNER_LOGIN: jeancarlos' '$ROOT/.github/workflows/promote.yml' && grep -qF 'pulls/\$PR_NUMBER/reviews' '$ROOT/.github/workflows/promote.yml' && grep -qF 'HEAD_SHA=' '$ROOT/.github/workflows/promote.yml' && grep -qF 'headRefOid' '$ROOT/.github/workflows/promote.yml'"
+check "promotion review lookup paginates and ignores comments" bash -c "grep -qF -- '--paginate --slurp' '$ROOT/tools/merge-promotion-pr.sh' && grep -qF 'state != \"COMMENTED\"' '$ROOT/tools/merge-promotion-pr.sh' && grep -qF -- '--paginate --slurp' '$ROOT/.github/workflows/promote.yml' && grep -qF 'state != \"COMMENTED\"' '$ROOT/.github/workflows/promote.yml'"
 check "promote release tags the recorded merge commit" has promote.yml 'ref="refs/tags/$tag" -f sha="$merge_sha"'
 check "promote validates release metadata as data from the merge commit" has promote.yml 'const config = fs.readFileSync("config.xml", "utf8")'
 check "promote release does not execute scripts from the merged commit" bash -c "! grep -q 'bash tools/check-version.sh' '$ROOT/.github/workflows/promote.yml'"

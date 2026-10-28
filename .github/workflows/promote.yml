@@ -8,14 +8,24 @@ on:
     branches:
       - develop
       - "release-bump/**"
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Merged develop-to-main pull request number
+        required: true
+        type: number
+      merge_sha:
+        description: Verified pull request merge commit
+        required: true
+        type: string
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
     branches: [main]
   pull_request_review:
     types: [submitted, edited, dismissed]
 permissions: {}
 concurrency:
-  group: promote-${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}
+  group: promote-${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref || inputs.merge_sha || github.ref_name }}
   cancel-in-progress: false
 jobs:
   promote:
@@ -36,6 +46,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          CODEOWNER_LOGIN: jeancarlos
           SHA: ${{ github.event.workflow_run.head_sha }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           EVENT: ${{ github.event.workflow_run.event }}
@@ -185,15 +196,16 @@ jobs:
             pr="$(gh pr create --base main --head develop --title "Release: $(date -u +%Y-%m-%d) develop to main" --body "CI and security checks passed on develop. This promotion publishes v$develop_version after code-owner approval.")"
             pr="${pr##*/}"
           fi
-          bash tools/merge-promotion-pr.sh "$pr" "$SHA"
+          BASE_VERSION="$(node -p 'JSON.parse(require("fs").readFileSync("package.json", "utf8")).version')" bash tools/merge-promotion-pr.sh "$pr" "$SHA"
 
   merge-approved-promotion:
     if: github.repository_owner == 'jeancarlos' && ((github.event_name == 'pull_request' && github.event.pull_request.action != 'closed' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop') || (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop'))
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
       checks: read
+      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -207,10 +219,10 @@ jobs:
           CODEOWNER_LOGIN: jeancarlos
           PR_NUMBER: ${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}
-        run: bash tools/merge-promotion-pr.sh "$PR_NUMBER" "$SHA"
+        run: BASE_VERSION="$(node -p 'JSON.parse(require("fs").readFileSync("package.json", "utf8")).version')" bash tools/merge-promotion-pr.sh "$PR_NUMBER" "$SHA"
 
   publish-promotion-release:
-    if: github.repository_owner == 'jeancarlos' && github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop'
+    if: github.repository_owner == 'jeancarlos' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     name: publish promotion release
     runs-on: ubuntu-latest
     permissions:
@@ -220,21 +232,27 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ inputs.merge_sha }}
           fetch-depth: 1
           persist-credentials: false
       - name: tag and dispatch the signed release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          PR_NUMBER: ${{ inputs.pull_request }}
+          MERGE_SHA: ${{ inputs.merge_sha }}
           CODEOWNER_LOGIN: jeancarlos
         run: |
           set -euo pipefail
-          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$MERGE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid promotion commit SHA" >&2; exit 1; }
-          review_state="$(gh api "repos/$GH_REPO/pulls/$PR_NUMBER/reviews" --jq "[.[] | select(.user.login == \"$CODEOWNER_LOGIN\" and .commit_id == \"$HEAD_SHA\")] | sort_by(.submitted_at) | last | .state // \"\"")"
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ && "$MERGE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid promotion reference" >&2; exit 1; }
+          pr_data="$(gh pr view "$PR_NUMBER" --repo "$GH_REPO" --json state,baseRefName,headRefName,headRefOid,mergeCommit --jq '{state,baseRefName,headRefName,headRefOid,mergeSha:.mergeCommit.oid}')"
+          [ "$(jq -r .state <<< "$pr_data")" = MERGED ] || { echo "promotion PR #$PR_NUMBER is not merged" >&2; exit 1; }
+          [ "$(jq -r .baseRefName <<< "$pr_data")" = main ] && [ "$(jq -r .headRefName <<< "$pr_data")" = develop ] || { echo "PR #$PR_NUMBER is not develop to main" >&2; exit 1; }
+          HEAD_SHA="$(jq -r .headRefOid <<< "$pr_data")"
+          [ "$(jq -r .mergeSha <<< "$pr_data")" = "$MERGE_SHA" ] || { echo "merge SHA does not match PR #$PR_NUMBER" >&2; exit 1; }
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid promotion head SHA" >&2; exit 1; }
+          reviews="$(gh api "repos/$GH_REPO/pulls/$PR_NUMBER/reviews?per_page=100" --paginate --slurp)"
+          review_state="$(jq -r --arg login "$CODEOWNER_LOGIN" --arg sha "$HEAD_SHA" '[.[][] | select(.user.login == $login and .commit_id == $sha and .state != "COMMENTED")] | sort_by(.submitted_at) | last | .state // ""' <<< "$reviews")"
           [ "$review_state" = APPROVED ] || { echo "merged promotion lacks code-owner approval on $HEAD_SHA" >&2; exit 1; }
           version="$(node -e '
           const fs = require("fs");
