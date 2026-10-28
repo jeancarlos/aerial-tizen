@@ -39,6 +39,10 @@ echo "== version =="
 if bash "$DIR/version.test.sh"; then :; else failed=1; fi
 
 echo
+echo "== promotion release =="
+if node "$DIR/promotion-release.test.js"; then :; else failed=1; fi
+
+echo
 echo "== thumbnails =="
 if bash "$DIR/thumbs.test.sh"; then :; else failed=1; fi
 
