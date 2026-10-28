@@ -26,7 +26,7 @@ module.exports = [
     }
   },
   {
-    files: ['test/**/*.js', 'eslint.config.js'],
+    files: ['test/**/*.js', 'tools/**/*.js', 'eslint.config.js'],
     languageOptions: { ecmaVersion: 2022, sourceType: 'commonjs', globals: { require: 'readonly', module: 'writable', process: 'readonly', __dirname: 'readonly', console: 'readonly', setTimeout: 'readonly', clearTimeout: 'readonly', setImmediate: 'readonly' } },
     rules: { 'no-empty': ['error', { allowEmptyCatch: true }] }
   },
