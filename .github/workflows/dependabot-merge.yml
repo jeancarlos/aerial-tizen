@@ -32,6 +32,9 @@ jobs:
             gh pr comment "$pr" --body "Major or unparsed version bump, merge by hand after reading the changelog."
             exit 0
           fi
+          base="$(gh api "repos/$GH_REPO/git/ref/heads/develop" --jq .object.sha)"
+          [[ "$base" =~ ^[0-9a-f]{40}$ ]] || { echo "invalid develop base SHA" >&2; exit 1; }
           gh pr merge "$pr" --merge --match-head-commit "$SHA"
           gh workflow run ci.yml --ref develop
           gh workflow run security.yml --ref develop
+          gh workflow run dco.yml --ref develop --repo "$GH_REPO" --field base="$base"
