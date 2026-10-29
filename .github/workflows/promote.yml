@@ -88,7 +88,7 @@ jobs:
               echo "$file at $ref is not a regular text file" >&2
               return 1
             }
-            jq -r '.content | @base64d' <<< "$response" > "$destination"
+            jq -r '.content | gsub("\\s"; "") | @base64d' <<< "$response" > "$destination"
           }
 
           version_at() {
@@ -428,7 +428,7 @@ jobs:
               echo "$file at $ref is not a regular text file" >&2
               return 1
             }
-            jq -r '.content | @base64d' <<< "$response" > "$destination"
+            jq -r '.content | gsub("\\s"; "") | @base64d' <<< "$response" > "$destination"
           }
           read_file_at "$MERGE_SHA" config.xml "$METADATA_DIR/config.xml"
           read_file_at "$MERGE_SHA" package.json "$METADATA_DIR/package.json"
