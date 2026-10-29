@@ -4,6 +4,8 @@ Notable changes per release. Versions follow [Semantic Versioning](https://semve
 
 ## Unreleased
 
+## 1.0.5 - 2026-10-29
+
 The next video is prepared in the background while the current one plays, with normal loading as a fallback. This release also adds automated release summaries and improves playback test coverage.
 
 - feat: prebuffer the next video with playback fallback
