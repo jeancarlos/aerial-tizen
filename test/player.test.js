@@ -229,6 +229,20 @@ const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS, ERROR_SKIP_MS, MAX_
 
 {
   const t = boot();
+  let failPrepare;
+  t.ctx.webapis.avplay.prepareAsync = (ok, fail) => { failPrepare = fail; };
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  t.advance(PRELOAD_FADE_MS);
+  t.listener().onerror('early error');
+  t.advance(RETRY_DELAYS_MS[0]);
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov'], 'listener errors during preparation must wait for the prepare callback');
+  failPrepare('prepare failed');
+  t.advance(RETRY_DELAYS_MS[0]);
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v0.mov'], 'the prepare failure callback retries the video');
+}
+
+{
+  const t = boot();
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
   t.advance(PRELOAD_FADE_MS);
   t.listener().onbufferingcomplete();
@@ -612,6 +626,19 @@ const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS, ERROR_SKIP_MS, MAX_
 }
 
 {
+  const t = boot({ main: true, extra: { tizen: {
+    tvinputdevice: { registerKey() { throw new Error('unsupported key'); } },
+    application: { getCurrentApplication() { throw new Error('unavailable'); } }
+  } } });
+  t.advance(PRELOAD_FADE_MS);
+  t.ctx.avplay.getState = () => { throw new Error('unavailable'); };
+  t.ctx.avplay.play = t.ctx.avplay.pause = () => { throw new Error('unavailable'); };
+  assert.doesNotThrow(() => [10252, 415, 19, 413].forEach(code => t.press(code)), 'unsupported TV controls must not crash the app');
+  t.press(13);
+  assert.strictEqual(t.ctx.menuOpen, true, 'the menu remains usable after unsupported TV controls');
+}
+
+{
   const t = boot({ main: true });
   t.advance(PRELOAD_FADE_MS);
   assert.ok(t.events.some(e => e[0] === 'app_start'), 'main.js must announce the start');
@@ -753,9 +780,11 @@ const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS, ERROR_SKIP_MS, MAX_
 }
 
 {
-  const probe = boot({ main: true, fileContent: '{}' });
-  const other = vm.runInContext('playlist.filter(i => i !== videoIndex)[0]', probe.ctx);
-  const t = boot({ main: true, fileContent: JSON.stringify({ aerial_index: String(other) }) });
+  let other;
+  const t = boot({ main: true, fileContent: ctx => {
+    other = ctx.playlist.find(i => i !== ctx.videoIndex);
+    return JSON.stringify({ aerial_index: String(other) });
+  } });
   vm.runInContext('startupIndex = videoIndex', t.ctx);
   t.finishRead();
   assert.strictEqual(vm.runInContext('videoIndex', t.ctx), other, 'the video saved on disk is restored when the start-up pick differs');
@@ -820,6 +849,8 @@ assert.throws(() => boot({ main: true, extra: { CATALOG: [] } }), /CATALOG is em
   secondaryListener.oncurrentplaytime(1);
   assert.ok(!t.elements.preload.classes.has('visible'), 'the thumbnail disappears when the prepared player advances');
   assert.ok(t.events.some(e => e[0] === 'transition_ms' && e[1].video === 'L1'), 'the prepared player reports the completed transition');
+  secondaryListener.oncurrentplaytime(2);
+  assert.strictEqual(t.events.filter(e => e[0] === 'transition_ms' && e[1].video === 'L1').length, 1, 'later playback-time events do not report the same transition again');
 }
 
 {
