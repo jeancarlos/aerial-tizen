@@ -753,9 +753,11 @@ const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS, ERROR_SKIP_MS, MAX_
 }
 
 {
-  const probe = boot({ main: true, fileContent: '{}' });
-  const other = vm.runInContext('playlist.filter(i => i !== videoIndex)[0]', probe.ctx);
-  const t = boot({ main: true, fileContent: JSON.stringify({ aerial_index: String(other) }) });
+  let other;
+  const t = boot({ main: true, fileContent: ctx => {
+    other = ctx.playlist.find(i => i !== ctx.videoIndex);
+    return JSON.stringify({ aerial_index: String(other) });
+  } });
   vm.runInContext('startupIndex = videoIndex', t.ctx);
   t.finishRead();
   assert.strictEqual(vm.runInContext('videoIndex', t.ctx), other, 'the video saved on disk is restored when the start-up pick differs');
