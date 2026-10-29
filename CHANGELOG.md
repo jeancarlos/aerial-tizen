@@ -4,6 +4,10 @@ Notable changes per release. Versions follow [Semantic Versioning](https://semve
 
 ## Unreleased
 
+## 1.0.4 - 2026-10-29
+
+- Maintenance release.
+
 ## 1.0.3 - 2026-10-28
 
 - Supports Tizen 5.5 on 2020 TVs and uses ADAPTIVE_INFO for 4K resolution detection.
