@@ -136,6 +136,8 @@ Every promotion from develop to main prepares the next patch release automatical
 
 When the optional release-summary runner is enabled, it adds a short Antigravity summary and the first line of each commit since the preceding release to the GitHub release description. Existing notes are kept, except for the default maintenance placeholder. The job runs after publication on a runner labelled `aerial-release-notes`, with 9router reachable at `host.docker.internal:20128` and its API key in `$HOME/.config/aerial-release/9router.key`. Set the repository variable `AERIAL_RELEASE_SUMMARY_RUNNER` to `enabled` only after the runner is configured. A failed summary leaves the published release unchanged.
 
+On the runner host, create a 9router key restricted to `ag/gemini-3.8-flash-low`, save it at that path with mode `600`, then run `bash tools/release-runner/install.sh`. The installer checks the key's restrictions before registering a repository runner. The container runs without Linux capabilities or a Docker socket; it still has network access, so only run trusted workflows on it.
+
 Every release archive is signed with cosign using GitHub's keyless identity. Download the `.zip` and its `.zip.sigstore.json` from the release, then:
 
 ```bash

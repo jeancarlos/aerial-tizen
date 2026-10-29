@@ -76,6 +76,7 @@ echo
 echo "== release notes =="
 if bash "$DIR/release-notes.test.sh"; then :; else failed=1; fi
 if node "$DIR/release-message.test.js"; then :; else failed=1; fi
+if bash "$DIR/release-runner.test.sh"; then :; else failed=1; fi
 
 echo
 echo "== reproducible release =="
