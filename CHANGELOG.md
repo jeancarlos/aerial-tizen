@@ -4,6 +4,21 @@ Notable changes per release. Versions follow [Semantic Versioning](https://semve
 
 ## Unreleased
 
+The next video is prepared in the background while the current one plays, with normal loading as a fallback. This release also adds automated release summaries and improves playback test coverage.
+
+- feat: prebuffer the next video with playback fallback
+- Merge pull request #143 from jeancarlos/feature/avplay-prebuffer
+- docs: add notes for the next release
+- feat: prepare release summaries through 9router
+- feat: isolate release runner in a container
+- Merge pull request #145 from jeancarlos/feature/v1-0-5-release-notes
+- docs: simplify release summary description
+- Merge pull request #146 from jeancarlos/feature/release-notes-generation
+- fix: stabilize playback restore coverage
+- test: cover playback and unsupported controls
+- Merge pull request #149 from jeancarlos/feature/stabilize-restore-test
+- chore: prepare v1.0.5 release
+
 ## 1.0.4 - 2026-10-29
 
 - Maintenance release.

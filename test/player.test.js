@@ -229,6 +229,20 @@ const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS, ERROR_SKIP_MS, MAX_
 
 {
   const t = boot();
+  let failPrepare;
+  t.ctx.webapis.avplay.prepareAsync = (ok, fail) => { failPrepare = fail; };
+  vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
+  t.advance(PRELOAD_FADE_MS);
+  t.listener().onerror('early error');
+  t.advance(RETRY_DELAYS_MS[0]);
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov'], 'listener errors during preparation must wait for the prepare callback');
+  failPrepare('prepare failed');
+  t.advance(RETRY_DELAYS_MS[0]);
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v0.mov'], 'the prepare failure callback retries the video');
+}
+
+{
+  const t = boot();
   vm.runInContext("loadSettings(); buildPlaylist(); playVideo(0);", t.ctx);
   t.advance(PRELOAD_FADE_MS);
   t.listener().onbufferingcomplete();
@@ -612,6 +626,19 @@ const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS, ERROR_SKIP_MS, MAX_
 }
 
 {
+  const t = boot({ main: true, extra: { tizen: {
+    tvinputdevice: { registerKey() { throw new Error('unsupported key'); } },
+    application: { getCurrentApplication() { throw new Error('unavailable'); } }
+  } } });
+  t.advance(PRELOAD_FADE_MS);
+  t.ctx.avplay.getState = () => { throw new Error('unavailable'); };
+  t.ctx.avplay.play = t.ctx.avplay.pause = () => { throw new Error('unavailable'); };
+  assert.doesNotThrow(() => [10252, 415, 19, 413].forEach(code => t.press(code)), 'unsupported TV controls must not crash the app');
+  t.press(13);
+  assert.strictEqual(t.ctx.menuOpen, true, 'the menu remains usable after unsupported TV controls');
+}
+
+{
   const t = boot({ main: true });
   t.advance(PRELOAD_FADE_MS);
   assert.ok(t.events.some(e => e[0] === 'app_start'), 'main.js must announce the start');
@@ -753,9 +780,11 @@ const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS, ERROR_SKIP_MS, MAX_
 }
 
 {
-  const probe = boot({ main: true, fileContent: '{}' });
-  const other = vm.runInContext('playlist.filter(i => i !== videoIndex)[0]', probe.ctx);
-  const t = boot({ main: true, fileContent: JSON.stringify({ aerial_index: String(other) }) });
+  let other;
+  const t = boot({ main: true, fileContent: ctx => {
+    other = ctx.playlist.find(i => i !== ctx.videoIndex);
+    return JSON.stringify({ aerial_index: String(other) });
+  } });
   vm.runInContext('startupIndex = videoIndex', t.ctx);
   t.finishRead();
   assert.strictEqual(vm.runInContext('videoIndex', t.ctx), other, 'the video saved on disk is restored when the start-up pick differs');
@@ -794,5 +823,120 @@ const { PRELOAD_FADE_MS, BUFFER_TIMEOUT_MS, RETRY_DELAYS_MS, ERROR_SKIP_MS, MAX_
 }
 
 assert.throws(() => boot({ main: true, extra: { CATALOG: [] } }), /CATALOG is empty/, 'an empty catalog must stop the app loudly');
+
+{
+  const t = boot();
+  let ready;
+  let secondaryListener;
+  const calls = [];
+  const second = {
+    open: u => calls.push(['open', u]), setDisplayRect() {}, setStreamingProperty: (k, v) => calls.push([k, v]),
+    setListener: l => { secondaryListener = l; }, prepareAsync: () => {},
+    play: () => calls.push(['play']), stop() {}, close() {}
+  };
+  t.ctx.webapis.avplaystore = { getPlayer: () => second };
+  vm.runInContext("loadSettings(); settings.videoOrder = 'sequential'; buildPlaylist(); playVideo(0)", t.ctx);
+  t.advance(PRELOAD_FADE_MS);
+  t.listener().onbufferingcomplete();
+  assert.deepStrictEqual(calls[0], ['open', 'http://x/v1.mov'], 'next video is prepared while the current video plays');
+  assert.ok(calls.some(c => c[0] === 'ADAPTIVE_INFO' && c[1] === 'FIXED_MAX_RESOLUTION=3840X2160'), 'prebuffering uses the same 4K setting as ordinary playback');
+  ready = secondaryListener;
+  ready.onbufferingcomplete();
+  t.listener().onstreamcompleted();
+  t.advance(PRELOAD_FADE_MS);
+  assert.ok(calls.some(c => c[0] === 'play'), 'the prepared player starts the next video');
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov'], 'the prepared video is not opened a second time');
+  secondaryListener.oncurrentplaytime(1);
+  assert.ok(!t.elements.preload.classes.has('visible'), 'the thumbnail disappears when the prepared player advances');
+  assert.ok(t.events.some(e => e[0] === 'transition_ms' && e[1].video === 'L1'), 'the prepared player reports the completed transition');
+  secondaryListener.oncurrentplaytime(2);
+  assert.strictEqual(t.events.filter(e => e[0] === 'transition_ms' && e[1].video === 'L1').length, 1, 'later playback-time events do not report the same transition again');
+}
+
+{
+  const t = boot();
+  let closed = 0;
+  const second = {
+    open() {}, setDisplayRect() {}, setStreamingProperty() {}, setListener() {}, prepareAsync() {},
+    stop() {}, close() { closed++; }
+  };
+  t.ctx.webapis.avplaystore = { getPlayer: () => second };
+  vm.runInContext("loadSettings(); settings.videoOrder = 'sequential'; buildPlaylist(); playVideo(0)", t.ctx);
+  t.advance(PRELOAD_FADE_MS);
+  t.listener().onbufferingcomplete();
+  t.advance(BUFFER_TIMEOUT_MS);
+  assert.strictEqual(closed, 1, 'an unfinished prebuffer times out and releases the player');
+  t.listener().onstreamcompleted();
+  t.advance(PRELOAD_FADE_MS);
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v1.mov'], 'a timeout falls back to ordinary playback');
+}
+
+{
+  const t = boot();
+  let pendingListener;
+  const second = {
+    open() {}, setDisplayRect() {}, setStreamingProperty() {}, setListener: l => { pendingListener = l; },
+    prepareAsync() {}, stop() {}, close() {}, play() { throw new Error('decoder unavailable'); }
+  };
+  t.ctx.webapis.avplaystore = { getPlayer: () => second };
+  vm.runInContext("loadSettings(); settings.videoOrder = 'sequential'; buildPlaylist(); playVideo(0)", t.ctx);
+  t.advance(PRELOAD_FADE_MS);
+  t.listener().onbufferingcomplete();
+  pendingListener.onbufferingcomplete();
+  t.listener().onstreamcompleted();
+  t.advance(PRELOAD_FADE_MS + RETRY_DELAYS_MS[0]);
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v1.mov'], 'a failed prebuffered play retries on the normal player');
+}
+
+{
+  const t = boot();
+  Object.defineProperty(t.ctx.webapis, 'avplaystore', { get() { throw new Error('unsupported'); } });
+  vm.runInContext("loadSettings(); settings.videoOrder = 'sequential'; buildPlaylist(); playVideo(0)", t.ctx);
+  t.advance(PRELOAD_FADE_MS);
+  t.listener().onbufferingcomplete();
+  t.listener().onstreamcompleted();
+  t.advance(PRELOAD_FADE_MS);
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v1.mov'], 'an unavailable player store does not stop ordinary playback');
+}
+
+{
+  const t = boot();
+  let secondaryListener;
+  let closed = 0;
+  const second = {
+    open() {}, setDisplayRect() {}, setStreamingProperty() {},
+    setListener: l => { secondaryListener = l; }, prepareAsync() {}, play() { throw new Error('not ready'); },
+    stop() {}, close() { closed++; }
+  };
+  t.ctx.webapis.avplaystore = { getPlayer: () => second };
+  vm.runInContext("loadSettings(); settings.videoOrder = 'sequential'; buildPlaylist(); playVideo(0)", t.ctx);
+  t.advance(PRELOAD_FADE_MS);
+  t.listener().onbufferingcomplete();
+  secondaryListener.onerror('unsupported');
+  assert.strictEqual(closed, 1, 'a failed prebuffer releases the second player');
+  t.listener().onstreamcompleted();
+  t.advance(PRELOAD_FADE_MS);
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v1.mov'], 'prebuffer failure uses ordinary playback');
+}
+
+{
+  const t = boot();
+  let secondaryListener;
+  let closed = 0;
+  const second = {
+    open() {}, setDisplayRect() {}, setStreamingProperty() {},
+    setListener: l => { secondaryListener = l; }, prepareAsync() {},
+    stop() {}, close() { closed++; }
+  };
+  t.ctx.webapis.avplaystore = { getPlayer: () => second };
+  vm.runInContext("loadSettings(); settings.videoOrder = 'sequential'; buildPlaylist(); playVideo(0)", t.ctx);
+  t.advance(PRELOAD_FADE_MS);
+  t.listener().onbufferingcomplete();
+  secondaryListener.onresourceconflicted();
+  assert.strictEqual(closed, 1, 'a resource conflict releases the second player');
+  t.listener().onstreamcompleted();
+  t.advance(PRELOAD_FADE_MS);
+  assert.deepStrictEqual(t.opened, ['http://x/v0.mov', 'http://x/v1.mov'], 'a resource conflict uses ordinary playback');
+}
 
 console.log('player tests passed');

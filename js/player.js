@@ -29,6 +29,7 @@ var loadingEl = document.getElementById('loading');
 // ── Playlist ──
 
 function buildPlaylist() {
+  cancelPrebuffer();
   playlist = [];
   for (var i = 0; i < CATALOG.length; i++) {
     if (settings.category === 'all' || CATALOG[i].category === settings.category) {
@@ -137,6 +138,7 @@ function stopAndClose() {
 function stopPlayback() {
   playToken++;
   clearWatchdog();
+  cancelPrebuffer();
   stopAndClose();
 }
 
@@ -173,12 +175,52 @@ function skipAfterError() {
 //
 // A session is one video: the URL list to walk and the retry budget spent on
 // each. A run is one avplay.open of one URL inside that session. Only the
-// newest run of the newest session is live — playToken retires a session,
-// currentRun retires a run — so every callback below asks runIsLive() before
+// newest run of the newest session is live - playToken retires a session,
+// currentRun retires a run - so every callback below asks runIsLive() before
 // touching anything shared.
 
 var currentRun = null;
 var watchdogTimer = null;
+var prebuffer = null;
+
+function cancelPrebuffer() {
+  var pending = prebuffer;
+  prebuffer = null;
+  if (!pending) return;
+  clearTimeout(pending.timer);
+  try { pending.player.stop(); } catch (e) {}
+  try { pending.player.close(); } catch (e) {}
+}
+
+function prepareNextVideo() {
+  if (prebuffer || nextIndex < 0) return;
+  var pending;
+  try {
+    if (!webapis.avplaystore || typeof webapis.avplaystore.getPlayer !== 'function') return;
+    var player = webapis.avplaystore.getPlayer();
+    if (!player || player === avplay) return;
+    pending = { player: player, index: nextIndex, url: getVideoUrls(nextIndex)[0], ready: false };
+    prebuffer = pending;
+    player.open(pending.url);
+    player.setDisplayRect(0, 0, 1920, 1080);
+    try { player.setStreamingProperty('ADAPTIVE_INFO', 'FIXED_MAX_RESOLUTION=3840X2160'); } catch (e) {}
+    player.setStreamingProperty('PREBUFFER_MODE', '0');
+    player.setListener({
+      onbufferingcomplete: function () {
+        if (prebuffer !== pending) return;
+        clearTimeout(pending.timer);
+        pending.ready = true;
+        telemetry('prebuffer_ready', { video: CATALOG[pending.index].label });
+      },
+      onerror: function () { if (prebuffer === pending) cancelPrebuffer(); },
+      onresourceconflicted: function () { if (prebuffer === pending) cancelPrebuffer(); }
+    });
+    pending.timer = setTimeout(function () { if (prebuffer === pending) cancelPrebuffer(); }, BUFFER_TIMEOUT_MS);
+    player.prepareAsync(function () {}, function () { if (prebuffer === pending) cancelPrebuffer(); });
+  } catch (e) {
+    if (pending && prebuffer === pending) cancelPrebuffer();
+  }
+}
 
 function startVideo(index, token) {
   showInfo(index);
@@ -221,6 +263,10 @@ function failRun(run, error) {
     video: CATALOG[s.index] ? CATALOG[s.index].label : '',
     reason: String(error || 'buffer timeout')
   });
+  if (run.prebuffered) {
+    stopAndClose();
+    avplay = webapis.avplay;
+  }
   retryOrAdvance(s);
 }
 
@@ -270,6 +316,12 @@ function playbackListener(run) {
       hidePreload();
       scheduleHideInfo();
       prefetchNextThumbnail();
+      prepareNextVideo();
+    },
+    oncurrentplaytime: function () {
+      if (run.prebuffered && !transitionReported && runIsLive(run)) {
+        playbackListener(run).onbufferingcomplete();
+      }
     },
     onstreamcompleted: function () {
       if (!runIsLive(run)) return;
@@ -312,7 +364,11 @@ function tryPlay(s) {
 }
 
 function playVideo(index) {
+  var buffered = prebuffer && prebuffer.ready && prebuffer.index === index &&
+    prebuffer.url === getVideoUrls(index)[0] ? prebuffer : null;
+  if (buffered) prebuffer = null;
   stopPlayback();
+  if (buffered) avplay = buffered.player;
   showLoading();
   transitionStartedAt = Date.now();
   transitionReported = false;
@@ -336,6 +392,17 @@ function playVideo(index) {
   preloadEl.classList.add('visible');
 
   setTimeout(function () {
-    if (token === playToken) startVideo(index, token);
+    if (token !== playToken) return;
+    if (!buffered) { startVideo(index, token); return; }
+    showInfo(index);
+    var session = { index: index, token: token, urls: getVideoUrls(index), urlIndex: 0, retry: 0, attempt: 1 };
+    var run = { session: session, attempt: 1, settled: false, prepared: true, prebuffered: true, startedAt: Date.now() };
+    currentRun = run;
+    try {
+      avplay.setListener(playbackListener(run));
+      armWatchdog(run);
+      avplay.play();
+      telemetry('prebuffer_used', { video: CATALOG[index].label });
+    } catch (e) { failRun(run, e); }
   }, PRELOAD_FADE_MS);
 }
