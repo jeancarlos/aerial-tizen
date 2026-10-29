@@ -38,7 +38,11 @@ pull_requests="$(gh pr list --repo "$GH_REPO" --state merged --base main --head 
 
 while IFS=$'\t' read -r pr merge_sha; do
   [[ "$pr" =~ ^[1-9][0-9]*$ && "$merge_sha" =~ ^[0-9a-f]{40}$ ]] || continue
-  package_json="$(gh api "repos/$GH_REPO/contents/package.json?ref=$merge_sha" --jq '.content | gsub("\\s"; "") | @base64d')"
+  if ! package_json="$(gh api "repos/$GH_REPO/contents/package.json?ref=$merge_sha" --jq '.content | gsub("\\s"; "") | @base64d')"; then
+    if jq -e '.status == "404"' <<< "$package_json" >/dev/null 2>&1; then continue; fi
+    echo "failed to read package.json for promotion PR #$pr" >&2
+    exit 1
+  fi
   version="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).version || "")' <<< "$package_json")"
   if [ "$version" = "$expected_version" ]; then
     gh workflow run promote.yml --ref main --repo "$GH_REPO" --field pull_request="$pr" --field merge_sha="$merge_sha" --field released_tag="v$anchor_version"
