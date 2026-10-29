@@ -86,3 +86,24 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PUBLISHED_TAG: ${{ github.ref_name }}
         run: bash tools/resume-promotion-release.sh
+  release-summary:
+    if: github.ref_type == 'tag' && vars.AERIAL_RELEASE_SUMMARY_RUNNER == 'enabled'
+    needs: release
+    runs-on: [self-hosted, Linux, X64, aerial-release-notes]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Update release description
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          ROUTER_URL: http://host.docker.internal:20128
+        run: |
+          ROUTER_API_KEY="$(cat "$HOME/.config/aerial-release/9router.key")"
+          export ROUTER_API_KEY
+          node tools/release-message.js
