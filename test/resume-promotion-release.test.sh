@@ -21,6 +21,7 @@ case "$1" in
         *"$GH_SHA_103"*) version=1.0.3 ;;
         *"$GH_SHA_104"*) version=1.0.4 ;;
         *"$GH_SHA_105"*) version=1.0.5 ;;
+        *4444444444444444444444444444444444444444*) printf '{"status":"404"}\n'; exit 1 ;;
         *) exit 1 ;;
       esac
       printf '{"version":"%s"}\n' "$version"
@@ -86,6 +87,13 @@ if grep -qF "workflow run promote.yml --ref main --repo jeancarlos/aerial-tizen 
   ok "does not replay an already published promotion on an older release retry"
 else
   fail "does not replay an already published promotion on an older release retry"
+fi
+
+PR_LIST='[{"number":2,"mergeCommit":{"oid":"4444444444444444444444444444444444444444"}}]'
+if run v1.0.3; then
+  ok "ignores historical promotions without package.json"
+else
+  fail "ignores historical promotions without package.json"
 fi
 
 if [ "$failed" -eq 0 ]; then
