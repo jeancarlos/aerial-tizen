@@ -4,6 +4,8 @@ Notable changes per release. Versions follow [Semantic Versioning](https://semve
 
 ## Unreleased
 
+## 1.0.5 - 2026-10-29
+
 The next video is prepared in the background while the current one plays. If prebuffering is unavailable or fails, playback falls back to normal loading.
 
 - feat: prebuffer the next video with playback fallback
