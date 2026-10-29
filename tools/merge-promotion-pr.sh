@@ -28,9 +28,9 @@ review_state() {
 
 version_at() {
   local ref="$1" config package lock
-  config="$(gh api "repos/$GH_REPO/contents/config.xml?ref=$ref" --jq '.content | @base64d')"
-  package="$(gh api "repos/$GH_REPO/contents/package.json?ref=$ref" --jq '.content | @base64d')"
-  lock="$(gh api "repos/$GH_REPO/contents/package-lock.json?ref=$ref" --jq '.content | @base64d')"
+  config="$(gh api "repos/$GH_REPO/contents/config.xml?ref=$ref" --jq '.content | gsub("\\s"; "") | @base64d')"
+  package="$(gh api "repos/$GH_REPO/contents/package.json?ref=$ref" --jq '.content | gsub("\\s"; "") | @base64d')"
+  lock="$(gh api "repos/$GH_REPO/contents/package-lock.json?ref=$ref" --jq '.content | gsub("\\s"; "") | @base64d')"
   node -e '
     const [config, packageText, lockText] = process.argv.slice(1);
     const widget = config.match(/<widget\b[^>]*\bversion="([^"]+)"/);
@@ -84,7 +84,7 @@ if [ "$state" = OPEN ]; then
 
   changelog_dir="$(mktemp -d)"
   trap 'rm -rf "$changelog_dir"' EXIT
-  gh api "repos/$GH_REPO/contents/CHANGELOG.md?ref=$sha" --jq '.content | @base64d' > "$changelog_dir/CHANGELOG.md"
+  gh api "repos/$GH_REPO/contents/CHANGELOG.md?ref=$sha" --jq '.content | gsub("\\s"; "") | @base64d' > "$changelog_dir/CHANGELOG.md"
   printf '{"version":"%s"}\n' "$head_version" > "$changelog_dir/package.json"
   cp "$changelog_dir/CHANGELOG.md" "$changelog_dir/CHANGELOG.before.md"
   node "$(dirname "${BASH_SOURCE[0]}")/refresh-promotion-changelog.js" "$changelog_dir" >/dev/null

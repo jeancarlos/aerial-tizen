@@ -73,6 +73,7 @@ check "promote release tags the recorded merge commit" has promote.yml 'ref="ref
 check "promotion creates metadata commits without checking out workflow SHAs" bash -c "! grep -qF 'git checkout' '$ROOT/.github/workflows/promote.yml'"
 check "promotion fetches only trusted branches" bash -c "grep -qF 'git fetch origin main develop' '$ROOT/.github/workflows/promote.yml' && ! grep -qF 'git fetch origin \"refs/heads/' '$ROOT/.github/workflows/promote.yml'"
 check "release continuation reads merge metadata through the Contents API" bash -c "grep -qF 'contents/\$file?ref=\$ref' '$ROOT/.github/workflows/promote.yml' && grep -qF 'read_file_at \"\$MERGE_SHA\" config.xml' '$ROOT/.github/workflows/promote.yml'"
+check "Contents API decoding tolerates line-wrapped base64" jq -nr '"YWJj\nZGVm" | gsub("\\s"; "") | @base64d'
 check "release continuation avoids checkout at the dispatch-provided SHA" bash -c "! grep -qF 'ref: \${{ inputs.merge_sha }}' '$ROOT/.github/workflows/promote.yml'"
 check "promote validates release metadata as data from the merge commit" has promote.yml 'const config = fs.readFileSync(process.argv[1], "utf8")'
 check "promote release does not execute scripts from the merged commit" bash -c "! grep -q 'bash tools/check-version.sh' '$ROOT/.github/workflows/promote.yml'"
