@@ -4,6 +4,10 @@ Notable changes per release. Versions follow [Semantic Versioning](https://semve
 
 ## Unreleased
 
+## 1.0.5 - 2026-10-29
+
+- Maintenance release.
+
 ## 1.0.4 - 2026-10-29
 
 - Maintenance release.
